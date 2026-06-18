@@ -50,12 +50,15 @@ jobs:
           envs: IMAGE_TAG,GHCR_USER,GHCR_TOKEN,DEPLOY_PATH
           script: |
             set -euo pipefail
+            # Strip stray CR/LF/spaces in case the secret was pasted with a newline.
+            DEPLOY_PATH="$(printf '%s' "$DEPLOY_PATH" | tr -d '[:space:]')"
+            IMAGE_TAG="$(printf '%s' "$IMAGE_TAG" | tr -d '[:space:]')"
             cd "$DEPLOY_PATH"
             # GHCR login only needed for PRIVATE packages. Public images skip it.
-            if [ -n "$GHCR_TOKEN" ]; then
-              echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            if [ -n "$(printf '%s' "$GHCR_TOKEN" | tr -d '[:space:]')" ]; then
+              printf '%s' "$GHCR_TOKEN" | tr -d '[:space:]' | docker login ghcr.io -u "$(printf '%s' "$GHCR_USER" | tr -d '[:space:]')" --password-stdin
             fi
-            export IMAGE_TAG="$IMAGE_TAG"
+            export IMAGE_TAG
             docker compose -f docker-compose.prod.yml pull
             docker compose -f docker-compose.prod.yml up -d --remove-orphans
             docker image prune -f
