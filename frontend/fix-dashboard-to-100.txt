@@ -1,0 +1,1184 @@
+You are a Senior Principal Frontend Engineer, Staff Product Designer, and UX Architect.
+
+Your mission is to refactor and upgrade my DashboardCraft admin dashboard / UI generator frontend until the UI, UX flow, code architecture, shadcn consistency, accessibility, and performance feel production-grade.
+
+IMPORTANT:
+- Do NOT connect to a real backend yet.
+- Do NOT implement real API integration.
+- Do NOT implement real authentication backend.
+- Do NOT implement real billing/payment.
+- Do NOT implement real SSE/WebSocket backend.
+- Do NOT implement real database integration.
+- Focus 100% on frontend quality.
+- You may create typed mock adapters and fake service layers to make the frontend backend-ready later.
+- Keep all data mocked, but structure it as if it will connect to backend later.
+
+==================================================
+SOURCE OF TRUTH
+==================================================
+
+Read the current audit result file:
+
+feedback.md
+
+The audit says the current dashboard has these weak scores:
+- Product Experience: 55/100
+- Visual Design: 65/100
+- shadcn Consistency: 58/100
+- UX Flow: 60/100
+- Component Architecture: 45/100
+- Production Readiness: 38/100
+
+The biggest issues are:
+- studio-page.tsx is monolithic.
+- settings/page.tsx is monolithic.
+- UI still has inconsistent visual tokens.
+- Some components still feel AI-generated.
+- Credit flow is fake but not structured cleanly.
+- Generation progress uses fake timers directly in UI.
+- Monaco Editor is imported too early.
+- Settings page needs better SaaS structure.
+- Empty states are too plain.
+- Version history and refine section flow are missing.
+- API key UX is not production-grade.
+- Accessibility and performance need improvement.
+
+Goal:
+Improve the frontend so the next audit can score 95-100 for:
+- Product Experience
+- Visual Design
+- shadcn Consistency
+- UX Flow
+- Component Architecture
+- Frontend Production Readiness
+- Accessibility
+- Performance
+
+==================================================
+PRODUCT CONTEXT
+==================================================
+
+This product is a dashboard generator / UI generator SaaS platform.
+
+Core frontend flows:
+
+1. User creates a new project.
+2. User writes a prompt.
+3. User chooses a theme.
+4. User sees credit cost.
+5. User confirms generation.
+6. User sees generation lifecycle progress.
+7. User previews the generated dashboard.
+8. User switches device preview:
+   - Desktop 1440
+   - Desktop 1280
+   - Tablet 768
+   - Mobile 390
+9. User views generated code.
+10. User opens project files.
+11. User views version history.
+12. User refines a section.
+13. User restores previous versions.
+14. User manages settings:
+   - Profile
+   - Generation defaults
+   - Workspace
+   - Security
+   - API keys
+   - Billing / Credits
+   - Danger zone
+
+The UX quality should feel like a premium UI generator platform similar to Shayna, but do not copy Shayna visually 1:1.
+Use the product quality benchmark, not direct visual cloning.
+
+==================================================
+TECH STACK
+==================================================
+
+Frontend:
+- Next.js App Router
+- TypeScript
+- Tailwind CSS
+- shadcn/ui
+- lucide-react
+- Monaco Editor only when code viewer is opened
+- Zod for schema validation
+- Optional: Zustand for local studio UI state
+- Optional: TanStack Query/SWR only with mock adapters, not real backend
+
+==================================================
+STRICT FE-ONLY RULES
+==================================================
+
+Do not call a real backend.
+
+Allowed:
+- typed mock API adapters
+- local mock service layer
+- mock generation lifecycle
+- mock credit balance
+- mock project list
+- mock API keys
+- mock billing transactions
+- mock settings persistence
+- localStorage only for harmless UI preferences, such as theme/device preference
+
+Not allowed:
+- real fetch to backend
+- real auth token handling
+- real payment integration
+- real SSE/WebSocket connection
+- real database connection
+- real API key generation from server
+- real backend middleware setup
+
+If you need backend-like behavior, implement it as:
+
+lib/mock/
+  mock-projects.ts
+  mock-generations.ts
+  mock-credits.ts
+  mock-settings.ts
+  mock-api-keys.ts
+
+lib/services/
+  project-service.ts
+  generation-service.ts
+  credit-service.ts
+  settings-service.ts
+  api-key-service.ts
+
+The service layer should look backend-ready, but use mock data internally.
+
+==================================================
+ABSOLUTE DESIGN RULES
+==================================================
+
+Use shadcn semantic tokens only for core UI.
+
+Allowed:
+- bg-background
+- bg-card
+- bg-muted
+- bg-primary
+- bg-secondary
+- text-foreground
+- text-muted-foreground
+- text-primary-foreground
+- border-border
+- ring-ring
+- destructive variants for dangerous actions
+
+Avoid:
+- bg-blue-*
+- bg-red-*
+- bg-orange-*
+- bg-purple-*
+- text-blue-*
+- text-red-*
+- border-blue-*
+- border-slate-*
+- bg-[#...]
+- random gradients
+- glassmorphism
+- over-customized shadows
+- arbitrary huge radius classes
+- magic/wand/sparkle icons
+- AI-looking copywriting
+- excessive badges
+- excessive cards without purpose
+
+Exceptions:
+- Status colors are allowed only if isolated in a semantic status utility.
+- Destructive actions must use shadcn destructive styling.
+
+==================================================
+ANTI AI-DESIGN RULES
+==================================================
+
+Remove all AI-looking visual patterns.
+
+Must remove:
+- Sparkles icon
+- Wand icon
+- Magic icon
+- overused blue/purple gradient
+- random floating cards
+- random glass blur
+- "AI-powered" hype copy
+- "supercharge"
+- "revolutionize"
+- "unlock your potential"
+- generic placeholder SaaS marketing text
+
+Replace with mature product language:
+- Generate
+- Preview
+- Validate
+- Export
+- Refine
+- Version
+- Project files
+- Credit cost
+- Build status
+- Component schema
+- Safe mode
+
+==================================================
+OBJECTIVE 1 — Frontend Design Token Cleanup
+==================================================
+
+Audit all frontend files and remove inconsistent visual classes.
+
+Search and fix:
+- bg-blue-
+- bg-red-
+- bg-orange-
+- bg-purple-
+- text-blue-
+- text-red-
+- border-blue-
+- border-slate-
+- bg-[#...]
+- shadow-[...]
+- rounded-[...]
+- from-
+- to-
+- via-
+- backdrop-blur-xl
+- sparkle
+- wand
+- magic
+
+Replace with shadcn semantic classes.
+
+Examples:
+
+Bad:
+className="bg-blue-700 text-white hover:bg-blue-800"
+
+Good:
+className="bg-primary text-primary-foreground hover:bg-primary/90"
+
+Bad:
+className="border-slate-200 bg-white text-slate-900"
+
+Good:
+className="border-border bg-card text-card-foreground"
+
+Bad:
+className="bg-[#f4f7f8] text-slate-950"
+
+Good:
+className="bg-background text-foreground"
+
+Acceptance criteria:
+- No hardcoded brand colors in dashboard/studio/settings core UI.
+- All pages support light/dark mode through shadcn variables.
+- No magic/wand/sparkle icons remain.
+- No random gradients remain in admin/studio/settings pages.
+- UI looks consistent across sidebar, topbar, cards, dialogs, sheets, tabs, forms.
+
+==================================================
+OBJECTIVE 2 — Split Monolithic Studio Page
+==================================================
+
+Current problem:
+studio-page.tsx is too large and mixes UI, fake generation logic, mock schema, dialogs, files, preview, and state.
+
+Refactor into:
+
+components/
+  studio/
+    studio-shell.tsx
+    studio-header.tsx
+    prompt-sidebar.tsx
+    prompt-examples.tsx
+    prompt-input-box.tsx
+    device-switcher.tsx
+    preview-canvas.tsx
+    empty-preview.tsx
+    generation-progress-overlay.tsx
+    theme-picker-sheet.tsx
+    generation-confirm-dialog.tsx
+    code-viewer-dialog.tsx
+    code-editor.tsx
+    project-files-sheet.tsx
+    version-history-panel.tsx
+    refine-section-panel.tsx
+    studio-bottom-theme-bar.tsx
+
+lib/
+  constants/
+    studio-themes.ts
+    prompt-examples.ts
+    device-options.ts
+
+types/
+  project.ts
+  generation.ts
+  studio.ts
+
+Acceptance criteria:
+- Main studio page only composes components.
+- Main studio page is under 200 lines.
+- No giant inline HTML renderer inside page component.
+- Preview rendering logic is isolated.
+- Code viewer logic is isolated.
+- Dialog/sheet states are isolated or managed cleanly.
+- Components are reusable and testable.
+- TypeScript types are moved to shared type files.
+
+==================================================
+OBJECTIVE 3 — Split Monolithic Settings Page
+==================================================
+
+Current problem:
+settings/page.tsx is too large and combines profile, generation preferences, workspace, security, API keys, billing, and danger zone.
+
+Refactor into:
+
+components/
+  settings/
+    settings-overview.tsx
+    settings-tabs.tsx
+    profile-settings.tsx
+    generation-settings.tsx
+    workspace-settings.tsx
+    security-settings.tsx
+    api-keys-settings.tsx
+    billing-settings.tsx
+    danger-zone.tsx
+    password-input.tsx
+    toggle-row.tsx
+    status-row.tsx
+    rule-item.tsx
+
+lib/
+  constants/
+    settings-tabs.ts
+    theme-options.ts
+    device-options.ts
+
+types/
+  settings.ts
+  billing.ts
+  api-key.ts
+
+Acceptance criteria:
+- app/app/settings/page.tsx is under 150 lines.
+- Each tab is isolated in its own component.
+- Shared UI rows are reusable.
+- API key creation modal is isolated.
+- Billing transaction list is isolated.
+- Danger zone has a proper confirmation dialog.
+- All settings remain mock-based but backend-ready.
+
+==================================================
+OBJECTIVE 4 — Create Frontend Mock Service Layer
+==================================================
+
+Do not connect backend.
+But remove messy direct mock logic from UI components.
+
+Create:
+
+lib/services/project-service.ts
+lib/services/generation-service.ts
+lib/services/credit-service.ts
+lib/services/settings-service.ts
+lib/services/api-key-service.ts
+
+Create mock data:
+
+lib/mock/projects.ts
+lib/mock/generations.ts
+lib/mock/credits.ts
+lib/mock/settings.ts
+lib/mock/api-keys.ts
+
+Services should expose async functions that simulate backend behavior:
+
+project-service.ts:
+- listProjects()
+- getProject(projectId)
+- createProject(payload)
+- updateProject(projectId, payload)
+
+credit-service.ts:
+- getCreditBalance()
+- getCreditTransactions()
+- previewGenerationCost(payload)
+- reserveGenerationCredits(payload)
+
+generation-service.ts:
+- createGeneration(payload)
+- getGeneration(jobId)
+- getGenerationFiles(jobId)
+- getGenerationVersions(jobId)
+- refineGenerationSection(jobId, payload)
+- restoreGenerationVersion(jobId, versionId)
+
+settings-service.ts:
+- getSettings()
+- updateProfile(payload)
+- updateGenerationPreferences(payload)
+- updateWorkspace(payload)
+- updateSecurityPreferences(payload)
+
+api-key-service.ts:
+- listApiKeys()
+- createApiKey(payload)
+- revokeApiKey(apiKeyId)
+
+Rules:
+- Use Promise-based APIs.
+- Add small artificial delay only inside mock services, not UI components.
+- Do not use fake logic directly in React components.
+- Do not store server-like state directly in page components.
+
+Acceptance criteria:
+- UI components call service functions, not inline mock manipulation.
+- Mock data is centralized.
+- Future backend replacement only requires changing service implementation.
+- No direct credit deduction in UI components.
+
+==================================================
+OBJECTIVE 5 — Replace Fake UI Timers with Mock Generation Lifecycle
+==================================================
+
+Current problem:
+Generation progress uses raw setTimeout in UI.
+
+Fix:
+Create a frontend-only mock lifecycle engine.
+
+Types:
+
+type GenerationStatus =
+  | "idle"
+  | "queued"
+  | "analyzing_prompt"
+  | "planning_layout"
+  | "generating_schema"
+  | "generating_code"
+  | "validating"
+  | "building_preview"
+  | "completed"
+  | "failed"
+  | "cancelled";
+
+Progress mapping:
+- idle: 0
+- queued: 5
+- analyzing_prompt: 15
+- planning_layout: 30
+- generating_schema: 45
+- generating_code: 65
+- validating: 78
+- building_preview: 90
+- completed: 100
+- failed: preserve last progress and show error
+
+Create:
+lib/generation/status.ts
+lib/generation/progress.ts
+lib/generation/mock-generation-runner.ts
+hooks/use-generation-job.ts
+
+Rules:
+- UI components should not contain raw setTimeout chains.
+- Mock runner may internally simulate lifecycle.
+- UI should consume status and progress.
+- Failed state should be supported.
+- Cancel state should be supported if possible.
+
+Acceptance criteria:
+- No raw setTimeout progress flow inside Studio UI.
+- Progress overlay shows current phase label.
+- UI is status-driven.
+- Failed state shows retry action.
+- Completed state loads generated preview/files/versions from mock service.
+
+==================================================
+OBJECTIVE 6 — Lazy Load Monaco Editor
+==================================================
+
+Current problem:
+Monaco Editor is imported synchronously.
+
+Fix:
+Create:
+
+components/studio/code-editor.tsx
+
+Use Next.js dynamic import:
+- ssr: false
+- skeleton/loading fallback
+- load only when CodeViewerDialog is open
+
+Rules:
+- No top-level import Editor from "@monaco-editor/react" in page or studio shell.
+- Code editor must not load on initial studio page render.
+- Code viewer dialog should show skeleton while Monaco loads.
+
+Acceptance criteria:
+- Monaco loads only when View Code is opened.
+- Initial Studio UI remains lightweight.
+- Code editor is isolated from main studio render.
+
+==================================================
+OBJECTIVE 7 — Secure Frontend Preview Canvas
+==================================================
+
+Still frontend-only.
+No isolated backend preview domain yet.
+
+Create:
+components/studio/preview-canvas.tsx
+lib/security/escape-html.ts
+lib/security/preview-sandbox.ts
+
+Rules:
+- Always escape user-controlled text.
+- iframe must have a descriptive title.
+- Use sandbox safely.
+- Do not use allow-same-origin.
+- Do not use allow-top-navigation.
+- Do not use allow-popups.
+- If scripts are not needed, use sandbox="".
+- If preview interactivity is simulated, use sandbox="allow-scripts" only and add code comments.
+
+Acceptance criteria:
+- Preview canvas has explicit security comments.
+- All prompt/schema/user values are escaped.
+- iframe has title.
+- Preview cannot access parent app context.
+- Security notes are documented in code.
+
+==================================================
+OBJECTIVE 8 — Add Frontend Version History and Refine Section UX
+==================================================
+
+Add frontend-only versioning with mock data.
+
+Create:
+
+components/studio/version-history-panel.tsx
+components/studio/refine-section-panel.tsx
+
+Features:
+- Version list:
+  - version number
+  - prompt summary
+  - quality score
+  - created at
+  - active marker
+  - restore button
+- Refine section:
+  - select section
+  - write refine instruction
+  - show mock cost preview
+  - confirmation before spending mock credits
+  - create new mock version after refine
+
+Rules:
+- No backend connection.
+- Use generation-service mock functions.
+- Refine creates a new version.
+- Restore changes active version.
+
+Acceptance criteria:
+- User can view versions.
+- User can restore previous version.
+- User can refine selected section.
+- Refine creates new version, not overwrite.
+- Refine flow uses mock credit confirmation.
+
+==================================================
+OBJECTIVE 9 — Improve Empty States and Onboarding
+==================================================
+
+Current problem:
+Empty states are too plain.
+
+Improve:
+
+Studio empty preview:
+- clear title
+- short explanation
+- 3 recommended prompt examples
+- selected theme
+- credit cost reminder
+- generate CTA guidance
+
+Projects empty state:
+- create project CTA
+- starter templates
+- what happens after creating a project
+
+API keys empty state:
+- why API keys exist
+- create key CTA
+- security warning
+
+Billing empty state:
+- balance
+- top up CTA
+- recent transaction placeholder
+
+Rules:
+- No empty state only says "No data".
+- Every empty state guides the user.
+- Use shadcn Card/Button/Badge/Alert consistently.
+- No AI-looking illustration/icon.
+
+==================================================
+OBJECTIVE 10 — Frontend API Key UX
+==================================================
+
+Keep it mocked, but make the UX production-grade.
+
+Rules:
+- API key raw value is shown only once after mock creation.
+- Stored/listed keys show only masked prefix.
+- API keys have:
+  - name
+  - prefix
+  - scope
+  - created_at
+  - last_used_at
+  - revoke action
+- Revoke requires confirmation dialog.
+- Copy action has feedback state.
+- Add security alert:
+  "For production, API keys must be hashed server-side and shown only once."
+
+Acceptance criteria:
+- No fake full key is permanently displayed in the list.
+- Create key modal warns user to copy key now.
+- Revoke key requires confirmation.
+- API key list is backend-ready but mocked.
+
+==================================================
+OBJECTIVE 11 — Frontend Auth Readiness Without Real Backend
+==================================================
+
+Do not implement real backend auth.
+
+But clean the frontend architecture:
+- Do not store access/refresh tokens in localStorage.
+- Remove any mock token persistence if present.
+- Use mock current user object for UI display only.
+- Keep auth-related service interface backend-ready.
+
+Create or update:
+lib/services/auth-service.ts
+lib/mock/current-user.ts
+types/auth.ts
+
+Rules:
+- No access token in localStorage.
+- No refresh token in localStorage.
+- AppShell can use mock current user.
+- Do not create real middleware if backend/session is not ready.
+- Add comment/documentation that real production auth must use httpOnly cookie/session.
+
+Acceptance criteria:
+- Searching project for access token localStorage storage returns none.
+- UI can still show mock user identity.
+- Auth service can later be replaced with real /me endpoint.
+
+==================================================
+OBJECTIVE 12 — Shared Type Contracts
+==================================================
+
+Create shared frontend types.
+
+Files:
+types/project.ts
+types/generation.ts
+types/credit.ts
+types/api-key.ts
+types/settings.ts
+types/auth.ts
+
+Define:
+
+Project:
+- id
+- name
+- description
+- themeSlug
+- createdAt
+- updatedAt
+
+GenerationJob:
+- id
+- projectId
+- prompt
+- status
+- progress
+- creditCost
+- qualityScore
+- errorMessage
+- createdAt
+- completedAt
+
+GeneratedFile:
+- path
+- language
+- content
+- size
+
+GenerationVersion:
+- id
+- versionNumber
+- prompt
+- qualityScore
+- createdAt
+- files
+- schema
+
+CreditBalance:
+- available
+- monthlyLimit
+- usedThisMonth
+
+CreditTransaction:
+- id
+- type
+- amount
+- balanceAfter
+- description
+- createdAt
+
+ApiKey:
+- id
+- name
+- prefix
+- scope
+- createdAt
+- lastUsedAt
+- revokedAt
+
+UserSettings:
+- profile
+- generationPreferences
+- workspace
+- securityPreferences
+
+Acceptance criteria:
+- No duplicate local types inside page files.
+- Components import shared types.
+- Mock services return shared types.
+- Future backend migration is easy.
+
+==================================================
+OBJECTIVE 13 — Frontend State Management Cleanup
+==================================================
+
+Rules:
+Use useState only for local UI state:
+- dialog open
+- selected tab
+- active device
+- active file path
+- textarea draft
+- selected section index
+
+Use mock service/hook state for server-like data:
+- projects
+- selected project
+- credit balance
+- credit transactions
+- generation job
+- generation files
+- API keys
+- settings
+
+Create hooks:
+hooks/use-projects.ts
+hooks/use-credit-balance.ts
+hooks/use-credit-transactions.ts
+hooks/use-generation-job.ts
+hooks/use-generation-files.ts
+hooks/use-generation-versions.ts
+hooks/use-api-keys.ts
+hooks/use-settings.ts
+
+These hooks may use:
+- useState + useEffect internally
+- or TanStack Query with mock services
+
+Acceptance criteria:
+- Page components do not own server-like mock data directly.
+- Hooks abstract data loading/mutation behavior.
+- Components receive clean props.
+- Mutations update local mock state consistently.
+
+==================================================
+OBJECTIVE 14 — Accessibility Upgrade
+==================================================
+
+Fix all accessibility issues.
+
+Requirements:
+- Icon-only buttons must have aria-label.
+- iframe must have descriptive title.
+- Dialogs must have title and description.
+- Loading progress must use aria-live.
+- Forms must use Label with htmlFor.
+- Disabled states must be visually clear.
+- Keyboard navigation must work for:
+  - theme picker
+  - device switcher
+  - project files list
+  - code viewer dialog
+  - confirm generation dialog
+- Error messages must be associated with fields.
+
+Acceptance criteria:
+- No icon-only button without aria-label.
+- No input without label.
+- No dialog without title.
+- No missing iframe title.
+- Keyboard-only navigation can complete generation flow.
+
+==================================================
+OBJECTIVE 15 — Performance Upgrade
+==================================================
+
+Fix performance risks:
+- Lazy-load Monaco.
+- Memoize preview HTML.
+- Avoid re-rendering preview canvas on prompt typing.
+- Extract static constants outside components.
+- Split heavy components.
+- Avoid generating huge HTML strings in page render.
+- Add skeletons for code viewer and file tree.
+
+Acceptance criteria:
+- Typing in prompt does not re-render Monaco.
+- Typing in prompt does not re-render iframe preview.
+- Main page components are small.
+- Heavy code editor is lazy-loaded.
+- Preview HTML updates only when generation result changes.
+
+==================================================
+OBJECTIVE 16 — shadcn Component Quality Pass
+==================================================
+
+Use shadcn components properly.
+
+Required components where appropriate:
+- Button
+- Card
+- Badge
+- Dialog
+- Sheet
+- Tabs
+- Input
+- Textarea
+- Select
+- Switch
+- Separator
+- Progress
+- ScrollArea
+- Skeleton
+- Alert
+- DropdownMenu
+- Tooltip
+
+Rules:
+- Do not manually rebuild what shadcn already provides.
+- Use variants properly.
+- Keep spacing consistent.
+- Use CardHeader/CardContent/CardFooter.
+- Use Alert for warnings and destructive notices.
+- Use Tooltip for icon-only actions.
+
+Acceptance criteria:
+- UI feels native shadcn.
+- No inconsistent button styling.
+- Tabs look consistent across settings/studio.
+- Dialogs and sheets share consistent spacing.
+- Warning/error states use Alert.
+
+==================================================
+OBJECTIVE 17 — Studio UX Completion
+==================================================
+
+Final Studio must include:
+
+Left sidebar:
+- Chat header
+- Intro helper card
+- Prompt examples
+- Prompt textarea
+- Character/quality indicator
+- Theme summary
+- Credit cost
+- Generate button
+
+Top toolbar:
+- Back to projects
+- Project title
+- Credits
+- Top Up
+- Device switcher
+- Copy
+- View Code
+- Project Files
+- New Project
+
+Canvas:
+- Empty preview state
+- Secure iframe preview
+- Responsive device width
+- Loading overlay
+- Completed preview
+- Failed preview state
+
+Bottom:
+- Selected theme bar
+- Theme picker
+
+Dialogs/Sheets/Panels:
+- Create project dialog
+- Confirm generation dialog
+- Theme picker sheet
+- Project files sheet
+- Code viewer dialog
+- Version history panel
+- Refine section panel
+
+Acceptance criteria:
+- All listed UI elements exist.
+- Every action has clear frontend state.
+- Every credit-consuming mock action has confirmation.
+- User always knows what happens next.
+- UI looks polished, calm, and professional.
+
+==================================================
+OBJECTIVE 18 — Settings UX Completion
+==================================================
+
+Final Settings must include:
+
+Tabs:
+- Profile
+- Generation
+- Workspace
+- Security
+- API Keys
+- Billing
+
+Profile:
+- avatar
+- name
+- email
+- bio
+- save button
+
+Generation:
+- default theme
+- default device
+- prompt boosting
+- safe component mode
+- auto-save
+- preview guides
+- compact mode
+
+Workspace:
+- workspace name
+- slug
+- project naming strategy
+- workspace members
+- invite member CTA
+
+Security:
+- password update
+- 2FA toggle
+- login alerts
+- sessions placeholder
+
+API keys:
+- key list
+- create key
+- copy key once
+- revoke with confirmation
+- security warning
+
+Billing:
+- credit balance
+- monthly usage progress
+- transactions
+- top up credits mock flow
+- upgrade plan mock flow
+
+Danger zone:
+- delete workspace
+- destructive confirmation
+
+Acceptance criteria:
+- Settings page looks like a real SaaS settings page.
+- No tab feels empty.
+- All settings are frontend-complete with mock services.
+- Destructive actions require confirmation.
+
+==================================================
+OBJECTIVE 19 — Frontend QA and Validation
+==================================================
+
+At minimum:
+- TypeScript must compile.
+- ESLint must pass.
+- No hardcoded forbidden classes remain.
+- No localStorage token remains.
+- No monolithic page over 250 lines.
+- No icon-only button without aria-label.
+- No fake credit deduction in component state.
+- No raw setTimeout generation progress in UI components.
+- Monaco is lazy-loaded.
+
+If possible, add Playwright smoke tests for:
+- Studio empty state
+- Generate confirmation modal
+- Theme picker opens
+- Device switcher works
+- Code viewer lazy-loads
+- Settings tabs render
+- API key create/revoke mock UX
+
+Add unit tests for:
+- progress mapping
+- credit formatting
+- escapeHtml
+- generation status labels
+- mock service behavior
+
+Acceptance criteria:
+- npm run lint passes.
+- npm run build passes.
+- npm run typecheck passes if available.
+- Test checklist is documented.
+
+==================================================
+OBJECTIVE 20 — Final Output Required
+==================================================
+
+After refactor, create:
+
+implementation-report.md
+
+It must include:
+
+# Frontend Implementation Report
+
+## 1. Summary
+Explain what was fixed.
+
+## 2. Files Changed
+List every changed file and why.
+
+## 3. FE Score Improvement
+Estimate new scores:
+
+| Area | Previous | New Target | Status |
+|---|---:|---:|---|
+| Product Experience | 55 | 95-100 | Done/Pending |
+| Visual Design | 65 | 95-100 | Done/Pending |
+| shadcn Consistency | 58 | 95-100 | Done/Pending |
+| UX Flow | 60 | 95-100 | Done/Pending |
+| Component Architecture | 45 | 95-100 | Done/Pending |
+| Frontend Production Readiness | 38 | 90-95 | Done/Pending |
+
+## 4. Mocked Areas
+List what is still mocked:
+- credits
+- generation jobs
+- projects
+- API keys
+- settings
+- billing
+- auth user
+
+## 5. Future Backend Integration Points
+List API endpoints that will be needed later, but DO NOT implement them now.
+
+## 6. QA Checklist
+List completed checks.
+
+## 7. Known Limitations
+Be honest if anything still uses mock adapter.
+
+==================================================
+EXECUTION RULES
+==================================================
+
+1. First inspect the codebase.
+2. Read feedback.md.
+3. Identify files related to:
+   - app shell
+   - sidebar
+   - topbar
+   - studio page
+   - settings page
+   - projects page
+   - billing/credits page
+   - templates page
+   - shared UI components
+   - global.css
+   - tailwind config
+4. Refactor incrementally.
+5. Do not break routes.
+6. Do not remove existing functionality unless replacing it with a cleaner frontend implementation.
+7. Keep TypeScript strict.
+8. Keep code modular.
+9. Prefer small components.
+10. Prefer shadcn components over custom UI.
+11. Use semantic tokens.
+12. Make all server-like data go through mock service adapters/hooks.
+13. Do not connect to real backend.
+14. Do not claim backend is done.
+15. Do not leave TODO comments unless listed in implementation-report.md.
+16. Final UI must look calm, premium, consistent, and production-grade.
+
+==================================================
+FINAL FE ACCEPTANCE CHECKLIST
+==================================================
+
+Before finishing, verify:
+
+[ ] No real backend integration was added.
+[ ] No real API fetch was added.
+[ ] Mock services exist for projects, credits, generations, settings, API keys.
+[ ] No localStorage token storage remains.
+[ ] No fake client-side credit deduction remains in UI components.
+[ ] No raw setTimeout progress flow remains in Studio UI components.
+[ ] Monaco Editor is lazy-loaded.
+[ ] Studio page is split into modular components.
+[ ] Settings page is split into modular components.
+[ ] No magic/sparkle/wand icons remain.
+[ ] No excessive gradients remain.
+[ ] Core UI uses shadcn semantic tokens.
+[ ] Preview iframe is sandboxed safely.
+[ ] User-controlled preview text is escaped.
+[ ] Version history exists.
+[ ] Refine section flow exists.
+[ ] Project files sheet exists.
+[ ] Code viewer dialog exists.
+[ ] Theme picker exists.
+[ ] Credit confirmation exists.
+[ ] Mock generation lifecycle exists.
+[ ] API key create/revoke UX exists.
+[ ] Billing/credits UI is frontend-complete.
+[ ] Empty states are helpful and actionable.
+[ ] Icon-only buttons have aria-label.
+[ ] Forms have labels.
+[ ] npm run lint passes.
+[ ] npm run build passes.
+[ ] implementation-report.md is created.
+
+Start now.

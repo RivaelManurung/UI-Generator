@@ -1,0 +1,14 @@
+DROP TABLE IF EXISTS audit_logs;
+DROP TABLE IF EXISTS templates;
+DROP TABLE IF EXISTS themes;
+DROP TABLE IF EXISTS idempotency_keys;
+DROP TABLE IF EXISTS credit_transactions;
+DROP TABLE IF EXISTS credit_wallets;
+DROP TABLE IF EXISTS generation_job_events;
+DROP TABLE IF EXISTS generation_jobs;
+ALTER TABLE IF EXISTS project_pages DROP CONSTRAINT IF EXISTS project_pages_current_version_fk;
+DROP TABLE IF EXISTS page_versions;
+DROP TABLE IF EXISTS project_pages;
+DROP TABLE IF EXISTS projects;
+DROP TABLE IF EXISTS refresh_tokens;
+DROP TABLE IF EXISTS users;

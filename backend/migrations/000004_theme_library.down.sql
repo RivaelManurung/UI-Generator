@@ -1,0 +1,2 @@
+ALTER TABLE themes DROP COLUMN IF EXISTS description;
+ALTER TABLE themes DROP COLUMN IF EXISTS library;

@@ -1,0 +1,14 @@
+.git
+.github
+node_modules
+.next
+out
+build
+.vercel
+.env*.local
+playwright-report
+test-results
+tests/.auth
+*.md
+Dockerfile
+.dockerignore

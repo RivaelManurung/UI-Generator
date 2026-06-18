@@ -1,0 +1,146 @@
+[
+  {
+    "path": "/",
+    "source": "src/app/page.tsx",
+    "requiresAuth": false,
+    "isDynamic": false
+  },
+  {
+    "path": "/admin",
+    "source": "src/app/admin/page.tsx",
+    "requiresAuth": true,
+    "isDynamic": false
+  },
+  {
+    "path": "/admin/analytics",
+    "source": "src/app/admin/analytics/page.tsx",
+    "requiresAuth": true,
+    "isDynamic": false
+  },
+  {
+    "path": "/admin/billing",
+    "source": "src/app/admin/billing/page.tsx",
+    "requiresAuth": true,
+    "isDynamic": false
+  },
+  {
+    "path": "/admin/generations",
+    "source": "src/app/admin/generations/page.tsx",
+    "requiresAuth": true,
+    "isDynamic": false
+  },
+  {
+    "path": "/admin/projects",
+    "source": "src/app/admin/projects/page.tsx",
+    "requiresAuth": true,
+    "isDynamic": false
+  },
+  {
+    "path": "/admin/templates",
+    "source": "src/app/admin/templates/page.tsx",
+    "requiresAuth": true,
+    "isDynamic": false
+  },
+  {
+    "path": "/admin/templates/new",
+    "source": "src/app/admin/templates/new/page.tsx",
+    "requiresAuth": true,
+    "isDynamic": false
+  },
+  {
+    "path": "/admin/themes",
+    "source": "src/app/admin/themes/page.tsx",
+    "requiresAuth": true,
+    "isDynamic": false
+  },
+  {
+    "path": "/admin/themes/new",
+    "source": "src/app/admin/themes/new/page.tsx",
+    "requiresAuth": true,
+    "isDynamic": false
+  },
+  {
+    "path": "/admin/users",
+    "source": "src/app/admin/users/page.tsx",
+    "requiresAuth": true,
+    "isDynamic": false
+  },
+  {
+    "path": "/app",
+    "source": "src/app/app/page.tsx",
+    "requiresAuth": true,
+    "isDynamic": false
+  },
+  {
+    "path": "/app/billing",
+    "source": "src/app/app/billing/page.tsx",
+    "requiresAuth": true,
+    "isDynamic": false
+  },
+  {
+    "path": "/app/projects",
+    "source": "src/app/app/projects/page.tsx",
+    "requiresAuth": true,
+    "isDynamic": false
+  },
+  {
+    "path": "/app/projects/demo-project",
+    "source": "src/app/app/projects/[projectId]/page.tsx",
+    "requiresAuth": true,
+    "isDynamic": true
+  },
+  {
+    "path": "/app/projects/demo-project/pages/new",
+    "source": "src/app/app/projects/[projectId]/pages/new/page.tsx",
+    "requiresAuth": true,
+    "isDynamic": true
+  },
+  {
+    "path": "/app/projects/new",
+    "source": "src/app/app/projects/new/page.tsx",
+    "requiresAuth": true,
+    "isDynamic": false
+  },
+  {
+    "path": "/app/settings",
+    "source": "src/app/app/settings/page.tsx",
+    "requiresAuth": true,
+    "isDynamic": false
+  },
+  {
+    "path": "/app/studio/demo-page",
+    "source": "src/app/app/studio/[pageId]/page.tsx",
+    "requiresAuth": true,
+    "isDynamic": true
+  },
+  {
+    "path": "/app/templates",
+    "source": "src/app/app/templates/page.tsx",
+    "requiresAuth": true,
+    "isDynamic": false
+  },
+  {
+    "path": "/login",
+    "source": "src/app/login/page.tsx",
+    "requiresAuth": false,
+    "isDynamic": false
+  },
+  {
+    "path": "/pricing",
+    "source": "src/app/pricing/page.tsx",
+    "requiresAuth": false,
+    "isDynamic": false
+  },
+  {
+    "path": "/register",
+    "source": "src/app/register/page.tsx",
+    "requiresAuth": false,
+    "isDynamic": false
+  },
+  {
+    "path": "/templates",
+    "source": "src/app/templates/page.tsx",
+    "requiresAuth": false,
+    "isDynamic": false
+  }
+]

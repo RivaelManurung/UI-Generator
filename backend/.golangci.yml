@@ -1,0 +1,43 @@
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  enable:
+    - govet
+    - staticcheck
+    - errcheck
+    - ineffassign
+    - unused
+    - gosec
+    - bodyclose
+    - rowserrcheck
+    - sqlclosecheck
+    - noctx
+    - revive
+    - misspell
+    - unconvert
+    - gocritic
+    - dupl
+
+linters-settings:
+  govet:
+    enable-all: true
+    disable:
+      - fieldalignment
+  revive:
+    rules:
+      - name: exported
+        disabled: true
+      - name: package-comments
+        disabled: true
+  gosec:
+    excludes:
+      - G104 # duplicate error checks handled by errcheck
+      - G304 # file paths constructed in dev/test scripts
+      - G404 # mock math/rand uses
+
+issues:
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0

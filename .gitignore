@@ -1,0 +1,45 @@
+# ───────────────────────────── OS / editor ─────────────────────────────
+.DS_Store
+Thumbs.db
+*.pem
+*.swp
+.idea/
+.vscode/
+
+# ───────────────────────────── Secrets / env ───────────────────────────
+# Ignore all env files but keep the committed examples.
+.env
+.env.*
+!.env.example
+!.env.local.example
+
+# ───────────────────────── Node / Next.js (frontend) ───────────────────
+node_modules/
+.next/
+out/
+build/
+.vercel/
+*.tsbuildinfo
+next-env.d.ts
+*-debug.log*
+.pnpm-debug.log*
+
+# Playwright (frontend e2e)
+playwright-report/
+test-results/
+frontend/tests/.auth/
+
+# ───────────────────────────── Go (backend) ────────────────────────────
+bin/
+backend/server
+backend/api
+backend/worker
+*.exe
+*.out
+coverage.out
+coverage.html
+
+# ───────────────────────────── Tooling / local ─────────────────────────
+# Local Claude Code workspace state (plans, settings). Remove this line if you
+# want to share team config under .claude/.
+.claude/

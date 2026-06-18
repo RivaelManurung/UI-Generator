@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS api_keys;
+DROP TABLE IF EXISTS user_settings;
+ALTER TABLE projects DROP COLUMN IF EXISTS status;

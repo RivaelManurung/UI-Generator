@@ -1,0 +1,776 @@
+openapi: 3.1.0
+info:
+  title: DashboardCraft AI API
+  description: Production-grade API specification for DashboardCraft AI Dashboard Generator (Shayna-level)
+  version: 1.0.0
+servers:
+  - url: /v1
+    description: Direct V1 Path (used in tests and direct routing)
+  - url: /api/v1
+    description: API V1 Path (used by the Next.js frontend client)
+paths:
+  /auth/register:
+    post:
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password]
+              properties:
+                name: { type: string }
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+      responses:
+        "201":
+          description: Registration successful, auth session returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSession'
+        "400": { description: Invalid parameters }
+        "409": { description: Email already registered }
+
+  /auth/login:
+    post:
+      summary: Authenticate user and return access/refresh tokens
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        "200":
+          description: Login successful, auth session returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSession'
+        "401": { description: Invalid email or password }
+
+  /auth/refresh:
+    post:
+      summary: Rotate refresh token to issue a new session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken: { type: string }
+      responses:
+        "200":
+          description: Token rotated successfully, new auth session returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSession'
+        "401": { description: Invalid or reused refresh token }
+
+  /auth/logout:
+    post:
+      summary: Revoke active refresh token and end session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken: { type: string }
+      responses:
+        "200":
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+
+  /auth/me:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Get authenticated user details
+      responses:
+        "200":
+          description: User details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+
+  /themes:
+    get:
+      summary: List all active design themes
+      responses:
+        "200":
+          description: List of themes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  themes:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Theme'
+
+  /templates:
+    get:
+      summary: List all available pre-designed templates
+      responses:
+        "200":
+          description: List of templates
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  templates:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Template'
+
+  /projects:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: List all owned projects
+      responses:
+        "200":
+          description: Projects list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  projects:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Project'
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Create a new project workspace
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                description: { type: string }
+                domain: { type: string }
+                defaultThemeSlug: { type: string }
+      responses:
+        "201":
+          description: Project created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  project:
+                    $ref: '#/components/schemas/Project'
+
+  /projects/{id}:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Get details of an owned project with its pages
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Project and pages list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  project:
+                    $ref: '#/components/schemas/Project'
+                  pages:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Page'
+        "404": { description: Project not found or unauthorized }
+    patch:
+      security: [{ bearerAuth: [] }]
+      summary: Update project workspace details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                description: { type: string }
+                domain: { type: string }
+                defaultThemeSlug: { type: string }
+      responses:
+        "200":
+          description: Updated project workspace
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  project:
+                    $ref: '#/components/schemas/Project'
+    delete:
+      security: [{ bearerAuth: [] }]
+      summary: Delete a project and its pages
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+
+  /projects/{id}/pages:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: List all pages inside a project workspace
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: List of pages
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pages:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Page'
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Create a new page under a project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, pageType]
+              properties:
+                name: { type: string }
+                pageType: { type: string }
+      responses:
+        "201":
+          description: Page created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  page:
+                    $ref: '#/components/schemas/Page'
+
+  /pages/{id}:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Retrieve detail of an owned page
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Page detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  page:
+                    $ref: '#/components/schemas/Page'
+    patch:
+      security: [{ bearerAuth: [] }]
+      summary: Update details of a page
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, pageType]
+              properties:
+                name: { type: string }
+                pageType: { type: string }
+      responses:
+        "200":
+          description: Page updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  page:
+                    $ref: '#/components/schemas/Page'
+    delete:
+      security: [{ bearerAuth: [] }]
+      summary: Delete a page
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Page deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+
+  /pages/{id}/generate:
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Asynchronously generate a page layout schema
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [prompt]
+              properties:
+                prompt: { type: string }
+                pageType: { type: string }
+                themeSlug: { type: string }
+                domain: { type: string }
+                outputMode: { type: string }
+      responses:
+        "202":
+          description: Generation job queued successfully (Async mode)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AsyncJobResponse'
+        "200":
+          description: Generation complete (Sync fallback in fake/test mode)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncGenerationResult'
+        "402": { description: Insufficient credit wallet balance }
+
+  /pages/{id}/refine:
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Asynchronously refine a specific section on a page
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [prompt, sectionIndex]
+              properties:
+                prompt: { type: string }
+                sectionIndex: { type: integer }
+      responses:
+        "202":
+          description: Refinement job queued successfully (Async mode)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AsyncJobResponse'
+        "200":
+          description: Refinement complete (Sync fallback in fake/test mode)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncGenerationResult'
+
+  /pages/{id}/versions:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: List all historical versions of a page
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: List of versions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  versions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PageVersion'
+
+  /pages/{id}/versions/{versionId}/restore:
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Restore page to a specific historical version
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: versionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Page restored
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  page:
+                    $ref: '#/components/schemas/Page'
+                  version:
+                    $ref: '#/components/schemas/PageVersion'
+
+  /generation-jobs/{id}:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Retrieve the status and results of a generation job
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Job status details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job:
+                    $ref: '#/components/schemas/GenerationJob'
+
+  /billing/wallet:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Get the current user credit balance
+      responses:
+        "200":
+          description: User wallet details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  wallet:
+                    $ref: '#/components/schemas/CreditWallet'
+
+  /billing/transactions:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: List user billing transactions ledger
+      responses:
+        "200":
+          description: Transaction history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transactions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CreditTransaction'
+
+  /admin/users:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: List all users (Admin only)
+      responses:
+        "200":
+          description: Users list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+        "403": { description: Administrator permission required }
+
+  /admin/generation-jobs:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: List all generation jobs across all users (Admin only)
+      responses:
+        "200":
+          description: Jobs list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/GenerationJob'
+
+  /admin/audit-logs:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: List system activity audit logs (Admin only)
+      responses:
+        "200":
+          description: Audit logs list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  auditLogs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuditLog'
+
+  /admin/metrics/summary:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: Retrieve key performance and usage indicators (Admin only)
+      responses:
+        "200":
+          description: Metrics summary object
+          content:
+            application/json:
+              schema:
+                type: object
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        email: { type: string, format: email }
+        role: { type: string, enum: [user, admin] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    AuthSession:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        accessToken: { type: string }
+        refreshToken: { type: string }
+        expiresAt: { type: integer }
+
+    Project:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string }
+        domain: { type: string }
+        defaultThemeSlug: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    Page:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        name: { type: string }
+        slug: { type: string }
+        pageType: { type: string }
+        currentVersionId: { type: string, format: uuid }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        currentVersion:
+          $ref: '#/components/schemas/PageVersion'
+
+    PageVersion:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        pageId: { type: string, format: uuid }
+        versionNumber: { type: integer }
+        prompt: { type: string }
+        schemaJson: { type: object }
+        generatedCode: { type: string }
+        qualityScore: { type: number }
+        createdAt: { type: string, format: date-time }
+
+    GenerationJob:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        pageId: { type: string, format: uuid }
+        requestId: { type: string }
+        operation: { type: string, enum: [generate, refine] }
+        status: { type: string, enum: [queued, processing, succeeded, failed, refunded, cancelled] }
+        prompt: { type: string }
+        pageType: { type: string }
+        domain: { type: string }
+        themeSlug: { type: string }
+        outputMode: { type: string }
+        creditCost: { type: integer }
+        errorMessage: { type: string }
+        retryCount: { type: integer }
+        startedAt: { type: string, format: date-time }
+        finishedAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    CreditWallet:
+      type: object
+      properties:
+        userId: { type: string, format: uuid }
+        balance: { type: integer }
+
+    CreditTransaction:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        type: { type: string, enum: [topup, reserve, usage, refund, adjustment] }
+        amount: { type: integer }
+        balanceAfter: { type: integer }
+        referenceType: { type: string }
+        referenceId: { type: string }
+        idempotencyKey: { type: string }
+        description: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    Theme:
+      type: object
+      properties:
+        slug: { type: string }
+        name: { type: string }
+        accent: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    Template:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        domain: { type: string }
+        pageType: { type: string }
+        componentHint: { type: integer }
+        tier: { type: string }
+        description: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    AuditLog:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        action: { type: string }
+        resourceType: { type: string }
+        resourceId: { type: string }
+        metadataJson: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    AsyncJobResponse:
+      type: object
+      properties:
+        jobId: { type: string, format: uuid }
+        status: { type: string }
+        creditCost: { type: integer }
+        pollUrl: { type: string }
+
+    SyncGenerationResult:
+      type: object
+      properties:
+        job:
+          $ref: '#/components/schemas/GenerationJob'
+        page:
+          $ref: '#/components/schemas/Page'
+        version:
+          $ref: '#/components/schemas/PageVersion'
+        wallet:
+          $ref: '#/components/schemas/CreditWallet'
