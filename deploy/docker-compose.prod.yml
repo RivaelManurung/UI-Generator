@@ -1,0 +1,91 @@
+# Production stack for the VPS. Pulls the images published by
+# .github/workflows/docker-publish.yml (GHCR) and runs the full app:
+# postgres + redis + api + worker + frontend.
+#
+# On the VPS (one-time): put this file + a `.env` (see .env.prod.example) in the
+# deploy dir, then:
+#   docker compose -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.prod.yml up -d
+# The GitHub "Deploy to VPS" workflow does the pull+up automatically on each release.
+name: ui-generator
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks: [appnet]
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks: [appnet]
+
+  api:
+    image: ${IMAGE_PREFIX}-backend-api:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    # Infra URLs point at the compose services; secrets/keys come from .env.
+    environment:
+      PORT: "8081"
+      APP_ENV: production
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+      REDIS_URL: redis://redis:6379/0
+    env_file: .env
+    ports:
+      - "${API_PORT:-8081}:8081"
+    networks: [appnet]
+
+  worker:
+    image: ${IMAGE_PREFIX}-backend-worker:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    environment:
+      APP_ENV: production
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+      REDIS_URL: redis://redis:6379/0
+    env_file: .env
+    networks: [appnet]
+
+  frontend:
+    image: ${IMAGE_PREFIX}-frontend:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on: [api]
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+    # NOTE: the frontend's API URL is baked at BUILD time (NEXT_PUBLIC_API_URL build-arg
+    # in docker-publish.yml). Set that to your public API URL before publishing images.
+    ports:
+      - "${FRONTEND_PORT:-3001}:3000"
+    networks: [appnet]
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  appnet:
+    driver: bridge

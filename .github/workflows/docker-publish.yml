@@ -74,5 +74,10 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # The frontend bakes the public API URL at build time. Set the repo
+          # variable NEXT_PUBLIC_API_URL (Settings → Variables) to your public API
+          # endpoint, e.g. https://api.your-domain.com/v1 . Ignored by the Go images.
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
