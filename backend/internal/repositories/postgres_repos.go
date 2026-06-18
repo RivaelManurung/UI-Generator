@@ -18,6 +18,7 @@ import (
 )
 
 type txKeyType struct{}
+
 var txKey txKeyType
 
 type SQLTxManager struct {
@@ -420,12 +421,12 @@ func (r *PostgresPageRepository) q(ctx context.Context) *db.Queries {
 
 func (r *PostgresPageRepository) CreateOwned(ctx context.Context, userID string, page domain.Page) (domain.Page, error) {
 	res, err := r.q(ctx).CreatePage(ctx, db.CreatePageParams{
-		ID:     toUUID(page.ID),
-		ID_2:   toUUID(page.ProjectID),
-		Name:   page.Name,
-		Slug:   page.Slug,
+		ID:       toUUID(page.ID),
+		ID_2:     toUUID(page.ProjectID),
+		Name:     page.Name,
+		Slug:     page.Slug,
 		PageType: page.PageType,
-		UserID: toUUID(userID),
+		UserID:   toUUID(userID),
 	})
 	if err != nil {
 		return domain.Page{}, mapDBError(err, "page")
@@ -576,6 +577,13 @@ func (r *PostgresPageVersionRepository) Create(ctx context.Context, version doma
 		CreatedBy:     fromUUID(res.CreatedBy),
 		CreatedAt:     fromTimestamptz(res.CreatedAt),
 	}, nil
+}
+
+func (r *PostgresPageVersionRepository) UpdateGeneratedCode(ctx context.Context, versionID string, code string) error {
+	if _, err := r.pool.Exec(ctx, "UPDATE page_versions SET generated_code=$1 WHERE id=$2::uuid", code, versionID); err != nil {
+		return mapDBError(err, "page version")
+	}
+	return nil
 }
 
 func (r *PostgresPageVersionRepository) ListOwnedByPage(ctx context.Context, userID string, pageID string) ([]domain.PageVersion, error) {

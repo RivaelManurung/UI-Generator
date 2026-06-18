@@ -11,6 +11,7 @@ import {
   CreditCard,
   FolderKanban,
   Gauge,
+  Gift,
   LayoutDashboard,
   LifeBuoy,
   LogOut,
@@ -151,6 +152,11 @@ const NAV: Record<SidebarVariant, NavSection[]> = {
           href: "/admin/templates",
           label: "Templates",
           icon: Shapes,
+        },
+        {
+          href: "/admin/free-templates",
+          label: "Free Templates",
+          icon: Gift,
         },
         {
           href: "/admin/themes",

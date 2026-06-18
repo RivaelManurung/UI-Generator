@@ -43,6 +43,9 @@ type PageVersionRepository interface {
 	ListOwnedByPage(ctx context.Context, userID string, pageID string) ([]domain.PageVersion, error)
 	FindOwned(ctx context.Context, userID string, pageID string, versionID string) (domain.PageVersion, error)
 	NextVersionNumber(ctx context.Context, pageID string) (int, error)
+	// UpdateGeneratedCode re-writes a version's rendered code in place (theme
+	// switching re-renders the same schema with new tokens — no new version, no AI).
+	UpdateGeneratedCode(ctx context.Context, versionID string, code string) error
 }
 
 type GenerationJobRepository interface {

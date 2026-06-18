@@ -47,6 +47,41 @@ export interface GeneratedPage {
   files: GeneratedFile[];
 }
 
+// Terminal generation-job states (worker.go). "succeeded" is the only success;
+// "refunded"/"canceled" mean the run stopped and the reserved credit was returned.
+const TERMINAL_JOB_STATES = new Set([
+  "succeeded",
+  "failed",
+  "refunded",
+  "canceled",
+  "cancelled",
+]);
+
+/**
+ * Poll a single-page generation job until it reaches a terminal state.
+ * Bounded so the UI never spins forever if the async worker is unavailable
+ * (e.g. Redis down) — on timeout it resolves with `status: "timeout"` so the
+ * caller can show an honest "still working" message instead of a fake failure.
+ */
+export async function pollGenerationJob(
+  jobId: string,
+  { intervalMs = 2000, timeoutMs = 60_000 }: { intervalMs?: number; timeoutMs?: number } = {},
+): Promise<{ status: string }> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    let status = "queued";
+    try {
+      const res = await http.get<{ job: { status: string } }>(`/generation-jobs/${jobId}`);
+      status = res.job?.status ?? "queued";
+    } catch {
+      // Transient read error — keep polling until the deadline.
+    }
+    if (TERMINAL_JOB_STATES.has(status)) return { status };
+    if (Date.now() >= deadline) return { status: "timeout" };
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+}
+
 export const generationService = {
   // Generate several coherent pages (dashboard, list, detail, form) from one prompt.
   async generatePages(
@@ -65,6 +100,37 @@ export const generationService = {
   // Load all of a project's pages (with their current schema + code) for the studio tabs.
   async getProjectPages(projectId: string): Promise<GeneratedPage[]> {
     return http.get<GeneratedPage[]>(`/projects/${projectId}/app-pages`);
+  },
+
+  // Rename a single screen. The backend re-slugs from the new name, so the
+  // returned slug is authoritative — callers should re-select by it.
+  async renamePage(
+    pageId: string,
+    name: string,
+    pageType: string,
+  ): Promise<{ slug: string }> {
+    const res = await http.patch<{ page: { slug: string } }>(`/pages/${pageId}`, {
+      name,
+      pageType,
+    });
+    return { slug: res.page?.slug ?? "" };
+  },
+
+  // Soft-delete a single screen.
+  async deletePage(pageId: string): Promise<void> {
+    await http.delete(`/pages/${pageId}`);
+  },
+
+  // Regenerate one screen from a fresh prompt (async — returns a job to poll).
+  async regeneratePage(
+    pageId: string,
+    body: { prompt: string; pageType: string; themeSlug: string },
+  ): Promise<{ jobId: string; status: string }> {
+    return http.post<{ jobId: string; status: string }>(
+      `/pages/${pageId}/generate`,
+      body,
+      { idempotent: true },
+    );
   },
   async getVersions(projectId: string): Promise<GenerationVersion[]> {
     return http.get<GenerationVersion[]>(`/projects/${projectId}/versions`);

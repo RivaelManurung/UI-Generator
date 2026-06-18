@@ -10,7 +10,6 @@ interface PromptInputBoxProps {
   onSubmit: (e: React.FormEvent) => void;
   isGenerating: boolean;
   selectedThemeName: string;
-  themeCost: number;
   onOpenThemePicker: () => void;
   pageCount: number;
   onChangePageCount: (count: number) => void;
@@ -27,7 +26,6 @@ export function PromptInputBox({
   onSubmit,
   isGenerating,
   selectedThemeName,
-  themeCost,
   onOpenThemePicker,
   pageCount,
   onChangePageCount,
@@ -43,7 +41,7 @@ export function PromptInputBox({
       <LabelForTextarea />
       <Textarea
         id="prompt-input"
-        className="min-h-[78px] resize-none text-xs rounded-xl border-border bg-background text-foreground shadow-sm placeholder:text-muted-foreground"
+        className="min-h-[78px] max-h-[180px] resize-none overflow-y-auto text-xs rounded-xl border-border bg-background text-foreground shadow-sm placeholder:text-muted-foreground"
         onChange={(event) => onChangePrompt(event.target.value)}
         placeholder="Describe what kind of webpage layout you want to generate. Minimum 40 characters..."
         value={prompt}
@@ -68,7 +66,7 @@ export function PromptInputBox({
         disabled={isGenerating}
       >
         <span className="text-foreground">Theme: {selectedThemeName}</span>
-        <span className="font-bold text-primary">{themeCost} credit{themeCost > 1 ? "s" : ""}</span>
+        <span className="font-bold text-primary">1 credit / page</span>
       </button>
 
       <div className="mt-3 flex items-center justify-between gap-2">

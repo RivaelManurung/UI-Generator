@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { CreditCard, Zap, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,29 +18,14 @@ import { CreditBalance, CreditTransaction } from "@/types/credit";
 interface BillingSettingsProps {
   balance: CreditBalance | null;
   transactions: CreditTransaction[];
-  onTopUp: (amount: number) => Promise<any>;
 }
 
-export function BillingSettings({ balance, transactions, onTopUp }: BillingSettingsProps) {
-  const [topUpLoading, setTopUpLoading] = useState(false);
+export function BillingSettings({ balance, transactions }: BillingSettingsProps) {
   const [upgradeLoading, setUpgradeLoading] = useState(false);
 
   const credits = balance?.available ?? 0;
   const monthlyLimit = balance?.monthlyLimit ?? 100;
   const creditUsage = Math.round((credits / monthlyLimit) * 100);
-
-  async function handleTopUp() {
-    setTopUpLoading(true);
-    try {
-      // Mock top up 100 credits
-      await onTopUp(100);
-      alert("Added 100 credits to balance (Stripe checkout mockup succeeded).");
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setTopUpLoading(false);
-    }
-  }
 
   async function handleUpgrade() {
     setUpgradeLoading(true);
@@ -120,13 +106,11 @@ export function BillingSettings({ balance, transactions, onTopUp }: BillingSetti
             </p>
           </div>
 
-          <Button onClick={handleTopUp} disabled={topUpLoading} className="w-full">
-            {topUpLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
+          <Button asChild className="w-full">
+            <Link href="/app/billing">
               <CreditCard className="h-4 w-4" />
-            )}
-            Top up credits
+              Buy credits
+            </Link>
           </Button>
 
           <Button variant="outline" onClick={handleUpgrade} disabled={upgradeLoading} className="w-full">

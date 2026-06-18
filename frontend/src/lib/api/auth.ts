@@ -1,4 +1,5 @@
 import { AuthUser, AuthSession } from "@/types/auth";
+import { setCachedAdmin } from "@/lib/api/admin-cache";
 export type { AuthSession };
 
 const bypassUser: AuthUser = {
@@ -38,6 +39,7 @@ export function saveSession(session: AuthSession) {
 }
 
 export function clearSession() {
+  setCachedAdmin(null); // a new user in this tab must re-derive admin status
   if (typeof window !== "undefined") {
     try {
       window.localStorage.removeItem(SESSION_KEY);

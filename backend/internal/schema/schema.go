@@ -41,6 +41,7 @@ var allowedComponents = map[string]bool{
 	"stepper":      true,
 	"progressList": true,
 	"mapPanel":     true,
+	"authForm":     true, // centered SaaS sign-in card (login pages)
 }
 
 type PageSchema struct {
@@ -49,7 +50,29 @@ type PageSchema struct {
 	Layout   string    `json:"layout"`
 	Theme    string    `json:"theme"`
 	Title    string    `json:"title"`
+	Brand    string    `json:"brand,omitempty"` // product/app name shown in the nav
+	Nav      []string  `json:"nav,omitempty"`   // product-specific menu (prompt-driven, not canned)
 	Sections []Section `json:"sections"`
+}
+
+// UnmarshalJSON tolerates nav given as strings or objects ({label}/{name}).
+func (p *PageSchema) UnmarshalJSON(data []byte) error {
+	type alias PageSchema
+	aux := &struct {
+		*alias
+		NavRaw   []any           `json:"nav"`
+		BrandRaw json.RawMessage `json:"brand"`
+	}{alias: (*alias)(p)}
+	if err := json.Unmarshal(data, aux); err != nil {
+		return err
+	}
+	if len(aux.NavRaw) > 0 {
+		p.Nav = coerceStrings(aux.NavRaw)
+	}
+	if b := rawToString(aux.BrandRaw); b != "" {
+		p.Brand = b
+	}
+	return nil
 }
 
 type Section struct {
@@ -61,6 +84,9 @@ type Section struct {
 	Items             []MetricItem      `json:"items,omitempty"`
 	ChartType         string            `json:"chartType,omitempty"`
 	DatasetPreset     string            `json:"datasetPreset,omitempty"`
+	Series            [][]float64       `json:"series,omitempty"`     // real chart data (one row per series)
+	Data              []float64         `json:"data,omitempty"`       // single-series convenience
+	Categories        []string          `json:"categories,omitempty"` // x-axis labels
 	Columns           []string          `json:"columns,omitempty"`
 	Rows              [][]string        `json:"rows,omitempty"`
 	Actions           []string          `json:"actions,omitempty"`
@@ -81,6 +107,8 @@ type MetricItem struct {
 	Icon  string `json:"icon,omitempty"`
 	// Image keywords (e.g. "coffee shop interior") or a resolved http(s) URL.
 	Image string `json:"image,omitempty"`
+	// Optional mini trend series for a real sparkline on the stat card.
+	Spark []float64 `json:"spark,omitempty"`
 }
 
 type Field struct {
@@ -139,6 +167,7 @@ func (m *MetricItem) UnmarshalJSON(data []byte) error {
 		Value json.RawMessage `json:"value"`
 		Trend json.RawMessage `json:"trend"`
 		Icon  json.RawMessage `json:"icon"`
+		Spark json.RawMessage `json:"spark"`
 	}{alias: (*alias)(m)}
 	if err := json.Unmarshal(data, aux); err != nil {
 		return err
@@ -147,6 +176,7 @@ func (m *MetricItem) UnmarshalJSON(data []byte) error {
 	m.Value = rawToString(aux.Value)
 	m.Trend = rawToString(aux.Trend)
 	m.Icon = rawToString(aux.Icon)
+	m.Spark = coerceFloats(aux.Spark)
 	return nil
 }
 
@@ -196,6 +226,91 @@ func mapLabel(m map[string]any) string {
 	return string(b)
 }
 
+func toFloat(v any) (float64, bool) {
+	switch t := v.(type) {
+	case float64:
+		return t, true
+	case json.Number:
+		f, err := t.Float64()
+		return f, err == nil
+	case string:
+		f, err := strconv.ParseFloat(strings.TrimSpace(strings.ReplaceAll(t, ",", "")), 64)
+		return f, err == nil
+	}
+	return 0, false
+}
+
+// coerceFloats tolerantly parses a JSON value into []float64 (numbers or numeric
+// strings); returns nil on anything unparseable so bad data never breaks decode.
+func coerceFloats(raw json.RawMessage) []float64 {
+	if len(raw) == 0 {
+		return nil
+	}
+	var arr []any
+	if err := json.Unmarshal(raw, &arr); err != nil {
+		return nil
+	}
+	out := make([]float64, 0, len(arr))
+	for _, v := range arr {
+		if f, ok := toFloat(v); ok {
+			out = append(out, f)
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// coerceFloatRows accepts [n,...], [[n,...],...], or [{data:[n,...]},...] and
+// normalizes to one numeric row per series.
+func coerceFloatRows(raw json.RawMessage) [][]float64 {
+	if len(raw) == 0 {
+		return nil
+	}
+	var arr []any
+	if err := json.Unmarshal(raw, &arr); err != nil || len(arr) == 0 {
+		return nil
+	}
+	rows := [][]float64{}
+	if _, ok := toFloat(arr[0]); ok { // flat array of numbers -> single series
+		if row := coerceFloats(raw); row != nil {
+			rows = append(rows, row)
+		}
+		return rows
+	}
+	for _, v := range arr {
+		switch t := v.(type) {
+		case []any:
+			row := make([]float64, 0, len(t))
+			for _, c := range t {
+				if f, ok := toFloat(c); ok {
+					row = append(row, f)
+				}
+			}
+			if len(row) > 0 {
+				rows = append(rows, row)
+			}
+		case map[string]any:
+			if d, ok := t["data"].([]any); ok {
+				row := make([]float64, 0, len(d))
+				for _, c := range d {
+					if f, ok := toFloat(c); ok {
+						row = append(row, f)
+					}
+				}
+				if len(row) > 0 {
+					rows = append(rows, row)
+				}
+			}
+		}
+	}
+	if len(rows) == 0 {
+		return nil
+	}
+	return rows
+}
+
 // coerceStrings turns a loosely-typed array (strings, numbers, or objects like
 // {label,value}) into a clean []string.
 func coerceStrings(arr []any) []string {
@@ -238,9 +353,17 @@ func (s *Section) UnmarshalJSON(data []byte) error {
 		FiltersRaw    []any           `json:"filters"`
 		ActionsRaw    []any           `json:"actions"`
 		PropertiesRaw map[string]any  `json:"properties"`
+		SeriesRaw     json.RawMessage `json:"series"`
+		DataRaw       json.RawMessage `json:"data"`
+		CategoriesRaw []any           `json:"categories"`
 	}{alias: (*alias)(s)}
 	if err := json.Unmarshal(data, aux); err != nil {
 		return err
+	}
+	s.Series = coerceFloatRows(aux.SeriesRaw)
+	s.Data = coerceFloats(aux.DataRaw)
+	if len(aux.CategoriesRaw) > 0 {
+		s.Categories = coerceStrings(aux.CategoriesRaw)
 	}
 	s.Type = rawToString(aux.Type)
 	s.Span = normalizeSpan(rawToString(aux.Span))
@@ -411,35 +534,54 @@ func Validate(page PageSchema) error {
 			if len(section.Items) < 2 {
 				return errors.New("mapPanel requires at least two locations")
 			}
+		case "authForm":
+			if section.Title == "" {
+				return errors.New("authForm requires a title")
+			}
 		}
 	}
 
+	// Each page type has a small set of REQUIRED anchors so the page stays
+	// recognizable, but composition beyond that is free — this lets the model
+	// vary layout (bento, extra panels, different mixes) instead of emitting the
+	// same skeleton every time. A density floor prevents sparse/empty pages.
+	anyOf := func(types ...string) bool {
+		for _, t := range types {
+			if seen[t] {
+				return true
+			}
+		}
+		return false
+	}
 	switch page.PageType {
 	case "dashboard":
-		// Production-grade density: a dashboard must show KPIs, a chart, AND a
-		// table — not just stats with an empty panel.
-		if !seen["statsGrid"] || !seen["chartPanel"] || !seen["dataTable"] {
-			return errors.New("dashboard requires statsGrid, chartPanel, and dataTable")
+		// Component MIX is the model's choice (driven by the prompt) — we only
+		// require enough density + at least one real data panel so it isn't sparse.
+		if !anyOf("statsGrid", "chartPanel", "dataTable", "kanbanBoard", "calendarView", "mapPanel", "progressList", "activityTimeline") {
+			return errors.New("dashboard needs at least one data panel")
+		}
+		if len(page.Sections) < 3 {
+			return errors.New("dashboard needs at least three sections")
 		}
 	case "list":
-		if !seen["filterToolbar"] || !seen["dataTable"] {
-			return errors.New("list page requires filterToolbar and dataTable")
+		if !seen["dataTable"] {
+			return errors.New("list page requires a dataTable")
 		}
 	case "form":
-		if !seen["formSection"] || !seen["actionFooter"] {
-			return errors.New("form page requires formSection and actionFooter")
+		if !seen["formSection"] {
+			return errors.New("form page requires a formSection")
 		}
 	case "detail":
-		if !seen["profileSummary"] || (!seen["tabbedContent"] && !seen["activityTimeline"]) {
-			return errors.New("detail page requires profileSummary plus tabs/activity")
+		if !seen["profileSummary"] {
+			return errors.New("detail page requires a profileSummary")
 		}
 	case "analytics":
-		if !seen["statsGrid"] || !seen["filterToolbar"] || !seen["chartPanel"] || !seen["dataTable"] {
-			return errors.New("analytics page requires statsGrid, filterToolbar, chartPanel, and dataTable")
+		if !seen["statsGrid"] || !seen["chartPanel"] {
+			return errors.New("analytics page requires statsGrid and chartPanel")
 		}
 	case "login":
-		if !seen["formSection"] || !seen["actionFooter"] {
-			return errors.New("login page requires formSection and actionFooter")
+		if !seen["formSection"] && !seen["authForm"] {
+			return errors.New("login page requires a formSection or authForm")
 		}
 	}
 

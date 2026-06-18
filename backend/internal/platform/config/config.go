@@ -24,6 +24,9 @@ type Config struct {
 	OpenAIAPIKey       string
 	OpenAIBaseURL      string
 	OpenAIModel        string
+	MidtransServerKey  string
+	MidtransClientKey  string
+	MidtransEnv        string
 }
 
 func Load() Config {
@@ -77,6 +80,9 @@ func Load() Config {
 		OpenAIAPIKey:       openAIKey,
 		OpenAIBaseURL:      openAIBase,
 		OpenAIModel:        openAIModel,
+		MidtransServerKey:  os.Getenv("MIDTRANS_SERVER_KEY"),
+		MidtransClientKey:  os.Getenv("MIDTRANS_CLIENT_KEY"),
+		MidtransEnv:        env("MIDTRANS_ENV", "sandbox"),
 	}
 }
 
@@ -93,7 +99,7 @@ func isOpenAICompatible(provider string) bool {
 
 func (c Config) Validate() error {
 	if strings.EqualFold(c.Environment, "production") {
-		if c.JWTSecret == "" || c.JWTSecret == "dev-only-change-me" || len(c.JWTSecret) < 32 {
+		if c.JWTSecret == "" || c.JWTSecret == "dev-only-change-me" || c.JWTSecret == "replace-with-at-least-32-random-characters" || len(c.JWTSecret) < 32 {
 			return errors.New("JWT_SECRET must be set to a strong value in production")
 		}
 		if c.DatabaseURL == "" {

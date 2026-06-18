@@ -24,7 +24,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ProjectPreviewThumb } from "@/components/app/project-preview-thumb";
 import { useProjects } from "@/hooks/use-projects";
+import { useDesignSystems } from "@/hooks/use-design-systems";
 import type { Project, ProjectStatus } from "@/types/project";
 import { cn } from "@/lib/utils";
 
@@ -43,6 +45,7 @@ function formatDate(value?: string) {
 
 export default function ProjectsPage() {
   const { projects, loading, deleteProject } = useProjects();
+  const designSystems = useDesignSystems();
   const [pendingDelete, setPendingDelete] = useState<Project | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -95,8 +98,14 @@ export default function ProjectsPage() {
       ) : (
         <div className="grid gap-5 md:grid-cols-2">
           {projects.map((project) => (
-            <Card key={project.id} className="flex flex-col transition-shadow hover:shadow-sm">
-              <CardHeader className="flex-row items-start justify-between space-y-0">
+            <Card key={project.id} className="flex flex-col overflow-hidden transition-shadow hover:shadow-sm">
+              <ProjectPreviewThumb
+                projectId={project.id}
+                brand={project.name}
+                themeSlug={project.defaultThemeSlug}
+                designSystems={designSystems}
+              />
+              <CardHeader className="flex-row items-start justify-between space-y-0 pt-5">
                 <div className="min-w-0 space-y-1.5">
                   <CardTitle className="tracking-normal">
                     <Link
@@ -158,7 +167,7 @@ export default function ProjectsPage() {
                   </Link>
                   <Button
                     variant="outline"
-                    className="ml-auto text-rose-600 hover:text-rose-600"
+                    className="ml-auto text-destructive hover:text-destructive"
                     onClick={() => setPendingDelete(project)}
                     aria-label={`Delete project ${project.name}`}
                   >
@@ -196,7 +205,7 @@ export default function ProjectsPage() {
               Cancel
             </Button>
             <Button
-              className="bg-rose-600 text-white hover:bg-rose-700"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={handleDelete}
               disabled={deleting}
             >

@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback, FormEvent } from "react";
-import { Copy, Code2, FolderOpen, History, Wrench, Menu, PanelLeftClose, PanelLeftOpen, Plus, Download } from "lucide-react";
+import { useState, useMemo, useEffect, useCallback, useRef, FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { Copy, Code2, FolderOpen, History, Wrench, Menu, PanelLeftClose, PanelLeftOpen, Plus, Download, Gift, Palette, ChevronDown, MoreHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog,
@@ -14,6 +13,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -21,6 +27,10 @@ import { useProjects } from "@/hooks/use-projects";
 import { useCreditBalance } from "@/hooks/use-credit-balance";
 import { useGenerationVersions } from "@/hooks/use-generation-versions";
 import { useGeneration } from "@/components/app/generation-provider";
+import { useIsAdmin } from "@/hooks/use-is-admin";
+import { PublishFreeTemplateDialog } from "./publish-free-template-dialog";
+import { StudioStartDialog } from "./studio-start-dialog";
+import { ScreenManageDialogs, type ScreenManageKind } from "./screen-manage-dialogs";
 
 import { DeviceKey } from "@/lib/constants/device-options";
 import {
@@ -39,7 +49,7 @@ import { StudioHeader } from "./studio-header";
 import { PromptExamples } from "./prompt-examples";
 import { PromptInputBox } from "./prompt-input-box";
 import { DeviceSwitcher } from "./device-switcher";
-import { ScreensCanvas, type ScreenCard } from "./screens-canvas";
+import { ScreenPreview, type ScreenCard } from "./screen-preview";
 import { InterfaceTokenSync } from "@/components/app/interface-token-sync";
 import { EmptyPreview } from "./empty-preview";
 import { GenerationConfirmDialog } from "./generation-confirm-dialog";
@@ -48,7 +58,6 @@ import { CodeViewerDialog } from "./code-viewer-dialog";
 import { ProjectFilesSheet } from "./project-files-sheet";
 import { VersionHistoryPanel } from "./version-history-panel";
 import { RefineSectionPanel } from "./refine-section-panel";
-import { StudioBottomThemeBar } from "./studio-bottom-theme-bar";
 import { renderPreview } from "@/lib/generation/preview-compiler";
 
 export default function StudioShell({ routeProjectId }: { routeProjectId?: string }) {
@@ -69,15 +78,26 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
     }
   }, [routeProjectId, projects, activeProjectId]);
 
+  // On a clean entry (the generic "/app/studio/demo" with no adopted project),
+  // offer to create a new project or open an existing one. Dismissible.
+  useEffect(() => {
+    if (!activeProjectId && (!routeProjectId || routeProjectId === "demo")) {
+      setIsStartOpen(true);
+    }
+  }, []); // run once on mount
+
   const currentProject =
     projects.find((p) => p.id === activeProjectId) ?? { id: "", name: "Untitled project" };
 
-  const { balance, purchaseCredits } = useCreditBalance();
+  const router = useRouter();
+  const isAdmin = useIsAdmin();
+  const { balance, refresh: refreshBalance } = useCreditBalance();
   const credits = balance?.available ?? 0;
 
   // Versions + refine still operate at the project level.
   const {
     versions,
+    activeVersion,
     restoreVersion,
     refineSection,
   } = useGenerationVersions(currentProject.id);
@@ -99,22 +119,34 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
   const [pageCount, setPageCount] = useState(1);
   // Auto = let the AI decide how many pages / which types fit the brief (Stitch-like).
   const [auto, setAuto] = useState(true);
+  // `selectedThemeSlug` is the theme for the NEXT generation (the picker value).
+  // `generatedThemeSlug` is the theme the CURRENT pages were generated with — the
+  // preview is locked to it, so changing the picker never re-skins an existing
+  // result. To apply a different theme you must regenerate.
   const [selectedThemeSlug, setSelectedThemeSlug] = useState("shadcn");
+  const [generatedThemeSlug, setGeneratedThemeSlug] = useState("shadcn");
+  const genThemeRef = useRef("shadcn");
 
   // Design-system catalog (single source of truth, fetched from the backend).
   const [designSystems, setDesignSystems] = useState<DesignSystem[]>([DEFAULT_DESIGN_SYSTEM]);
   useEffect(() => {
     let cancelled = false;
-    fetchDesignSystems().then((list) => {
-      if (!cancelled && list.length) setDesignSystems(list);
-    });
+    fetchDesignSystems()
+      .then((list) => {
+        if (!cancelled && list.length) setDesignSystems(list);
+      })
+      .catch(() => {
+        /* keep the default design system on failure */
+      });
     return () => {
       cancelled = true;
     };
   }, []);
   const [device, setDevice] = useState<DeviceKey>("desktop1440");
   const [activeCodePath, setActiveCodePath] = useState("app/page.tsx");
-  const [copyState, setCopyState] = useState("Copy");
+  // Per-screen management (rename / delete / regenerate) — a single piece of
+  // state instead of three dialog toggles. `key` is the ScreenCard key (slug||id).
+  const [manage, setManage] = useState<{ kind: ScreenManageKind; key: string } | null>(null);
 
   // Dialog and Sheets Toggles
   const [isChatOpen, setIsChatOpen] = useState(true);
@@ -125,10 +157,11 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
   const [isFilesOpen, setIsFilesOpen] = useState(false);
   const [isVersionsOpen, setIsVersionsOpen] = useState(false);
   const [isRefineOpen, setIsRefineOpen] = useState(false);
+  const [isPublishOpen, setIsPublishOpen] = useState(false);
+  const [isStartOpen, setIsStartOpen] = useState(false);
   const [boostPrompt, setBoostPrompt] = useState(true);
 
   const selectedTheme = designSystemBySlug(designSystems, selectedThemeSlug);
-  const themeCost = selectedTheme.cost ?? 1;
   // NOTE: the design system styles the GENERATED output (preview canvas + exported
   // code) only — NOT the studio's own chrome, which stays neutral on purpose.
 
@@ -160,6 +193,7 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
         if (!cancelled) {
           setPages([]);
           setSelectedSlug(null);
+          toast.error("Could not load this project's pages. Try reopening it.");
         }
       });
     return () => {
@@ -186,6 +220,9 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
   // its `active` state — so generation keeps running across /app navigation.
   const runGeneration = useCallback(async () => {
     if (active) return;
+    // Lock the preview to the theme this generation uses, from the moment it starts.
+    genThemeRef.current = selectedThemeSlug;
+    setGeneratedThemeSlug(selectedThemeSlug);
     const projectId = await ensureProjectId();
     try {
       await start(projectId, prompt, selectedThemeSlug, pageCount, auto);
@@ -215,7 +252,8 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
   const screenCards = useMemo<ScreenCard[]>(() => {
     const live = isGeneratingThisProject && active ? active.pages : pages;
     const total = isGeneratingThisProject && active ? active.total : pages.length;
-    const ds = designSystemBySlug(designSystems, selectedThemeSlug);
+    // Preview is locked to the GENERATED theme, never the live picker.
+    const ds = designSystemBySlug(designSystems, generatedThemeSlug);
     const cards: ScreenCard[] = live.map((p) => ({
       key: p.slug || p.id,
       name: p.name,
@@ -239,7 +277,7 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
       }
     }
     return cards;
-  }, [isGeneratingThisProject, active, pages, currentProject.name, selectedThemeSlug, designSystems]);
+  }, [isGeneratingThisProject, active, pages, currentProject.name, generatedThemeSlug, designSystems]);
 
   // Re-fetch the current project's pages (used after refine / restore).
   const refreshPages = useCallback(async () => {
@@ -257,14 +295,36 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
     }
   }, [currentProject.id]);
 
+  // Adopt the project's saved theme ONCE when it loads/changes (ref-guarded). This
+  // seeds BOTH the picker (next-gen theme) and the locked preview theme.
+  const themedProjectRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!activeProjectId) return;
+    const proj = projects.find((p) => p.id === activeProjectId);
+    if (proj?.defaultThemeSlug && themedProjectRef.current !== activeProjectId) {
+      themedProjectRef.current = activeProjectId;
+      setSelectedThemeSlug(proj.defaultThemeSlug);
+      setGeneratedThemeSlug(proj.defaultThemeSlug);
+      genThemeRef.current = proj.defaultThemeSlug;
+    }
+  }, [activeProjectId, projects]);
+
+  // The picker only changes the theme for the NEXT generation. It MUST NOT re-skin
+  // an already-generated result — the theme is locked to the generated output; to
+  // change it the user regenerates.
+  const handleSelectTheme = useCallback((slug: string) => {
+    setSelectedThemeSlug(slug);
+  }, []);
+
   // When the global provider reports a completed batch for THIS project,
   // re-fetch pages (selecting the first) and consume the signal.
   useEffect(() => {
     if (lastCompleted && lastCompleted.projectId === currentProject.id) {
       refreshPages();
+      refreshBalance(); // credits were just spent — keep the header balance live
       clearLastCompleted();
     }
-  }, [lastCompleted, currentProject.id, refreshPages, clearLastCompleted]);
+  }, [lastCompleted, currentProject.id, refreshPages, refreshBalance, clearLastCompleted]);
 
   // Keep the active code file path valid for the selected page.
   useEffect(() => {
@@ -272,6 +332,13 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
       setActiveCodePath(files[0].path);
     }
   }, [files, activeCodePath]);
+
+  const openExistingProject = useCallback((id: string) => {
+    setActiveProjectId(id);
+    setPrompt("");
+    setSelectedSlug(null);
+    setIsStartOpen(false);
+  }, []);
 
   function handleCreateProject(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -286,22 +353,35 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
       domain: "General",
       status: "draft",
       defaultThemeSlug: selectedThemeSlug,
-    }).then((created) => {
-      setActiveProjectId(created.id);
-      setPrompt("");
-      setPages([]);
-      setSelectedSlug(null);
-      setIsCreateProjectOpen(false);
-    });
+    })
+      .then((created) => {
+        setActiveProjectId(created.id);
+        setPrompt("");
+        setPages([]);
+        setSelectedSlug(null);
+        setIsCreateProjectOpen(false);
+      })
+      .catch((err) => {
+        toast.error(err instanceof Error ? err.message : "Could not create project");
+      });
   }
 
   async function handleCopyCode() {
     const activeFile = files.find((f) => f.path === activeCodePath) ?? files[0];
     if (!activeFile) return;
-    await navigator.clipboard.writeText(activeFile.content);
-    setCopyState("Copied");
-    setTimeout(() => setCopyState("Copy"), 1200);
+    try {
+      await navigator.clipboard.writeText(activeFile.content);
+      toast.success("Code copied to clipboard");
+    } catch {
+      toast.error("Could not copy — your browser blocked clipboard access.");
+    }
   }
+
+  // Resolve the page targeted by the ⋯ menu (ScreenCard key is slug||id).
+  const managePage = useMemo(
+    () => (manage ? pages.find((p) => (p.slug || p.id) === manage.key) ?? null : null),
+    [manage, pages],
+  );
 
   const [isZipping, setIsZipping] = useState(false);
   async function handleDownloadZip() {
@@ -315,6 +395,24 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
       setIsZipping(false);
     }
   }
+
+  // Keyboard: ⌘/Ctrl+Enter submits the prompt (opens the confirm) when it is
+  // long enough and nothing is mid-generation. Esc is handled natively by the
+  // Radix dialogs/sheets, so only the generate shortcut is wired here.
+  const overlayOpen =
+    isConfirmOpen || isThemeOpen || isCodeOpen || isFilesOpen || isVersionsOpen ||
+    isRefineOpen || isPublishOpen || isStartOpen || isCreateProjectOpen || manage !== null;
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (!(e.metaKey || e.ctrlKey) || e.key !== "Enter") return;
+      if (overlayOpen || isGenerating || prompt.trim().length < 40) return;
+      e.preventDefault();
+      setIsConfirmOpen(true);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [overlayOpen, isGenerating, prompt]);
 
   return (
     <main className="app-interface flex flex-col min-h-screen bg-background text-foreground">
@@ -330,12 +428,13 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
       <StudioHeader
         projectName={currentProject.name}
         credits={credits}
-        onTopUp={() => purchaseCredits(100)}
+        onTopUp={() => router.push("/app/billing")}
+        onSwitchProject={() => setIsStartOpen(true)}
       />
 
       <section className="grid flex-1 overflow-hidden lg:grid-cols-[auto_minmax(0,1fr)]">
         {/* Left prompts Sidebar */}
-        <aside className={`relative z-30 flex h-[calc(100vh-3.5rem)] flex-col border-r border-border bg-card transition-all duration-300 ${isChatOpen ? "w-[284px]" : "w-[52px]"}`}>
+        <aside className={`relative z-30 flex h-[calc(100svh-3.5rem)] flex-col border-r border-border bg-card transition-all duration-300 ${isChatOpen ? "w-[284px]" : "w-[52px]"}`}>
           <div className="flex h-14 items-center justify-between border-b border-border px-3">
             {isChatOpen && (
               <div>
@@ -358,14 +457,6 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
             <>
               <ScrollArea className="flex-1">
                 <div className="space-y-4 p-3">
-                  <Card className="border-border bg-card shadow-sm">
-                    <CardContent className="p-3">
-                      <p className="text-xs font-semibold leading-5 text-card-foreground">
-                        Describe what kind of product you need. I will generate a coherent set of pages — dashboard, list, detail, and form — that you can preview from the tabs.
-                      </p>
-                    </CardContent>
-                  </Card>
-
                   <PromptExamples onSelectPrompt={(text) => setPrompt(text)} />
                 </div>
               </ScrollArea>
@@ -379,7 +470,6 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
                 }}
                 isGenerating={isGenerating}
                 selectedThemeName={selectedTheme.name}
-                themeCost={themeCost}
                 onOpenThemePicker={() => setIsThemeOpen(true)}
                 pageCount={pageCount}
                 onChangePageCount={setPageCount}
@@ -396,61 +486,88 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
                 <Plus className="h-4 w-4" />
               </Button>
               <Button size="icon" variant="ghost" onClick={() => setIsThemeOpen(true)} aria-label="Choose page themes">
-                <PaletteIcon />
+                <Palette className="h-4 w-4" />
               </Button>
             </div>
           )}
         </aside>
 
         {/* Right workspace Area */}
-        <section className="flex h-[calc(100vh-3.5rem)] min-w-0 flex-col overflow-hidden">
+        <section className="flex h-[calc(100svh-3.5rem)] min-w-0 flex-col overflow-hidden">
           {/* Studio Actions Bar */}
           <div className="flex min-h-14 items-center justify-between gap-3 border-b border-border bg-background px-3 overflow-x-auto">
             <DeviceSwitcher device={device} onChangeDevice={setDevice} />
 
             <div className="flex shrink-0 items-center gap-1.5">
-              <Button disabled={!hasFiles} onClick={handleCopyCode} size="sm" variant="secondary" className="h-8 text-xs font-bold" aria-label="Copy active file code">
-                <Copy className="h-3.5 w-3.5 mr-1" />
-                {copyState}
-              </Button>
-
-              <Button disabled={!hasFiles} onClick={() => setIsCodeOpen(true)} size="sm" variant="secondary" className="h-8 text-xs font-bold" aria-label="Open code editor modal">
-                <Code2 className="h-3.5 w-3.5 mr-1" />
-                View Code
-              </Button>
-
-              <Button disabled={!hasFiles} onClick={() => setIsFilesOpen(true)} size="sm" variant="secondary" className="h-8 text-xs font-bold" aria-label="Open project files catalog">
-                <FolderOpen className="h-3.5 w-3.5 mr-1" />
-                Files
-              </Button>
-
-              <Button disabled={pages.length === 0 || isZipping} onClick={handleDownloadZip} size="sm" variant="secondary" className="h-8 text-xs font-bold" aria-label="Download all generated code as a ZIP">
-                <Download className="h-3.5 w-3.5 mr-1" />
-                {isZipping ? "Zipping…" : "Download ZIP"}
-              </Button>
-
-              <Button disabled={versions.length === 0} onClick={() => setIsVersionsOpen(true)} size="sm" variant="secondary" className="h-8 text-xs font-bold" aria-label="Open version history timeline">
-                <History className="h-3.5 w-3.5 mr-1" />
-                Versions
-              </Button>
-
+              {/* Primary creative action stays one click away. */}
               <Button disabled={!selectedPage} onClick={() => setIsRefineOpen(true)} size="sm" variant="secondary" className="h-8 text-xs font-bold" aria-label="Open section refinement panel">
                 <Wrench className="h-3.5 w-3.5 mr-1" />
                 Refine
               </Button>
 
-              <Button onClick={() => setIsCreateProjectOpen(true)} size="sm" className="h-8 text-xs font-bold" aria-label="Create new layout project">
-                <Plus className="h-3.5 w-3.5" />
-                New Project
+              {/* Code: copy / view / files / export — grouped to declutter the bar. */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button disabled={pages.length === 0} size="sm" variant="secondary" className="h-8 text-xs font-bold" aria-label="Code and export actions">
+                    <Code2 className="h-3.5 w-3.5 mr-1" />
+                    Code
+                    <ChevronDown className="h-3.5 w-3.5 ml-1 opacity-60" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem disabled={!hasFiles} onSelect={() => handleCopyCode()}>
+                    <Copy className="size-3.5" aria-hidden="true" />
+                    Copy active file
+                  </DropdownMenuItem>
+                  <DropdownMenuItem disabled={!hasFiles} onSelect={() => setIsCodeOpen(true)}>
+                    <Code2 className="size-3.5" aria-hidden="true" />
+                    View code
+                  </DropdownMenuItem>
+                  <DropdownMenuItem disabled={!hasFiles} onSelect={() => setIsFilesOpen(true)}>
+                    <FolderOpen className="size-3.5" aria-hidden="true" />
+                    Browse files
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem disabled={pages.length === 0 || isZipping} onSelect={() => handleDownloadZip()}>
+                    <Download className="size-3.5" aria-hidden="true" />
+                    {isZipping ? "Zipping…" : "Download ZIP"}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <Button disabled={versions.length === 0} onClick={() => setIsVersionsOpen(true)} size="sm" variant="secondary" className="h-8 text-xs font-bold" aria-label="Open version history timeline">
+                <History className="h-3.5 w-3.5 mr-1" />
+                History
               </Button>
+
+              {/* Overflow: less-used / admin actions. */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="More studio actions">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52">
+                  {isAdmin ? (
+                    <DropdownMenuItem disabled={!selectedPage} onSelect={() => setIsPublishOpen(true)}>
+                      <Gift className="size-3.5" aria-hidden="true" />
+                      Publish as free template
+                    </DropdownMenuItem>
+                  ) : null}
+                  <DropdownMenuItem onSelect={() => setIsCreateProjectOpen(true)}>
+                    <Plus className="size-3.5" aria-hidden="true" />
+                    New project
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
 
-          {/* Canvas Viewport — all screens on one canvas (Stitch-like). The old
-              top tab strip is gone: the canvas already shows every screen. */}
-          <div className="relative flex-1 overflow-hidden bg-muted/40">
+          {/* Full-area preview of the selected generated screen (device-framed,
+              fit-to-width). Switch screens via the tab strip inside ScreenPreview. */}
+          <div className="relative flex-1 overflow-hidden">
             {screenCards.length > 0 ? (
-              <ScreensCanvas
+              <ScreenPreview
                 screens={screenCards}
                 activeKey={selectedSlug}
                 onSelect={setSelectedSlug}
@@ -458,20 +575,21 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
                   setSelectedSlug(key);
                   setIsRefineOpen(true);
                 }}
+                onRename={(key) => setManage({ kind: "rename", key })}
+                onRegenerate={(key) => setManage({ kind: "regenerate", key })}
+                onDelete={(key) => setManage({ kind: "delete", key })}
+                device={device}
+                generating={isGeneratingThisProject}
+                completed={active?.completed}
+                total={active?.total}
               />
             ) : (
               <EmptyPreview
                 isGenerating={isGenerating}
                 onSelectExample={() => setPrompt("Create a professional warehouse operations product with a dashboard overview, an inventory list, an item detail page, and an intake form.")}
                 selectedThemeName={selectedTheme.name}
-                themeCost={themeCost}
               />
             )}
-
-            <StudioBottomThemeBar
-              selectedTheme={selectedTheme}
-              onOpenThemePicker={() => setIsThemeOpen(true)}
-            />
           </div>
         </section>
       </section>
@@ -482,7 +600,6 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
         onOpenChange={setIsConfirmOpen}
         prompt={prompt}
         themeName={selectedTheme.name}
-        themeCost={themeCost}
         creditsBalance={credits}
         boostPrompt={boostPrompt}
         onBoostPromptChange={setBoostPrompt}
@@ -499,7 +616,7 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
         onOpenChange={setIsThemeOpen}
         systems={designSystems}
         selectedThemeSlug={selectedThemeSlug}
-        onSelectTheme={setSelectedThemeSlug}
+        onSelectTheme={handleSelectTheme}
       />
 
       <CodeViewerDialog
@@ -526,7 +643,7 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
         open={isVersionsOpen}
         onOpenChange={setIsVersionsOpen}
         versions={versions}
-        activeVersionId={undefined}
+        activeVersionId={activeVersion?.id}
         onRestore={(id) => {
           restoreVersion(id).then(() => {
             refreshPages();
@@ -548,6 +665,39 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
         onRefine={async (sec, inst) => {
           await refineSection(sec, inst, selectedThemeSlug);
           await refreshPages();
+        }}
+      />
+
+      <PublishFreeTemplateDialog
+        open={isPublishOpen}
+        onOpenChange={setIsPublishOpen}
+        pageId={selectedPage?.id ?? null}
+        defaultTitle={selectedPage?.name ?? ""}
+      />
+
+      <StudioStartDialog
+        open={isStartOpen}
+        onOpenChange={setIsStartOpen}
+        projects={projects}
+        currentProjectId={activeProjectId}
+        onOpen={openExistingProject}
+        onCreate={() => {
+          setIsStartOpen(false);
+          setIsCreateProjectOpen(true);
+        }}
+      />
+
+      {/* Per-screen management: rename / delete / regenerate. */}
+      <ScreenManageDialogs
+        kind={manage?.kind ?? null}
+        page={managePage}
+        themeSlug={selectedThemeSlug}
+        onClose={() => setManage(null)}
+        onDone={(selectSlug) => {
+          refreshPages().then(() => {
+            if (selectSlug) setSelectedSlug(selectSlug);
+          });
+          refreshBalance();
         }}
       />
 
@@ -587,26 +737,5 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
         </DialogContent>
       </Dialog>
     </main>
-  );
-}
-
-function PaletteIcon() {
-  return (
-    <svg
-      className="h-4 w-4"
-      fill="none"
-      height="24"
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="2"
-      viewBox="0 0 24 24"
-      width="24"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <circle cx="12" cy="12" r="10" />
-      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-      <path d="M2 12h20" />
-    </svg>
   );
 }

@@ -1,0 +1,408 @@
+- generic [active] [ref=e1]:
+  - main [ref=e149]:
+    - status [ref=e150]
+    - generic [ref=e151]:
+      - generic [ref=e152]:
+        - link "My Projects" [ref=e153] [cursor=pointer]:
+          - /url: /app/projects
+          - img [ref=e154]
+          - text: My Projects
+        - generic [ref=e157]:
+          - img [ref=e159]
+          - generic [ref=e164]:
+            - paragraph [ref=e165]: Dashboard Studio|
+            - button "Switch or open a project" [ref=e166]:
+              - generic [ref=e167]: tesss
+              - img [ref=e168]
+      - generic [ref=e171]:
+        - generic [ref=e172]:
+          - img
+          - text: 1213 Credits
+        - button "Top up credit balance" [ref=e173]:
+          - img
+          - text: Top Up
+    - generic [ref=e174]:
+      - complementary [ref=e175]:
+        - generic [ref=e176]:
+          - generic [ref=e177]:
+            - paragraph [ref=e178]: Studio Engine
+            - paragraph [ref=e179]: Describe your layout requirements
+          - button "Collapse sidebar" [ref=e180]:
+            - img
+        - generic [ref=e184]:
+          - paragraph [ref=e187]: Describe what kind of product you need. I will generate a coherent set of pages — dashboard, list, detail, and form — that you can preview from the tabs.
+          - generic [ref=e188]:
+            - paragraph [ref=e189]: Recommended Preset Examples
+            - generic [ref=e190]:
+              - button "Load example prompt for Dashboard Overview" [ref=e191]:
+                - generic [ref=e192]:
+                  - img [ref=e194]
+                  - generic [ref=e196]:
+                    - paragraph [ref=e197]: Dashboard Overview
+                    - paragraph [ref=e198]: Stats cards, charts, and transactions
+              - button "Load example prompt for User Management" [ref=e199]:
+                - generic [ref=e200]:
+                  - img [ref=e202]
+                  - generic [ref=e207]:
+                    - paragraph [ref=e208]: User Management
+                    - paragraph [ref=e209]: Data table with search and actions
+              - button "Load example prompt for Product Inventory" [ref=e210]:
+                - generic [ref=e211]:
+                  - img [ref=e213]
+                  - generic [ref=e217]:
+                    - paragraph [ref=e218]: Product Inventory
+                    - paragraph [ref=e219]: Grid view with filters and modals
+              - button "Load example prompt for Order Management" [ref=e220]:
+                - generic [ref=e221]:
+                  - img [ref=e223]
+                  - generic [ref=e226]:
+                    - paragraph [ref=e227]: Order Management
+                    - paragraph [ref=e228]: Orders table with status details
+              - button "Load example prompt for Analytics Dashboard" [ref=e229]:
+                - generic [ref=e230]:
+                  - img [ref=e232]
+                  - generic [ref=e237]:
+                    - paragraph [ref=e238]: Analytics Dashboard
+                    - paragraph [ref=e239]: Charts, date picker, and reports
+        - generic [ref=e240]:
+          - generic [ref=e241]: Dashboard Generation Prompt Description Input
+          - textbox "Dashboard Generation Prompt Description Input" [ref=e242]:
+            - /placeholder: Describe what kind of webpage layout you want to generate. Minimum 40 characters...
+          - generic [ref=e243]:
+            - generic [ref=e244]: Min 40 characters required
+            - generic [ref=e245]: 0/40
+          - button "Open theme customization sheet" [ref=e246]:
+            - generic [ref=e247]: "Theme: shadcn/ui"
+            - generic [ref=e248]: 1 credit / page
+          - generic [ref=e249]:
+            - generic [ref=e250]: "Pages: Auto"
+            - group "Number of pages to generate" [ref=e251]:
+              - button "Let AI choose the number of pages automatically" [pressed] [ref=e252]: Auto
+              - button "Generate 1 page" [ref=e253]: "1"
+              - button "Generate 2 pages" [ref=e254]: "2"
+              - button "Generate 3 pages" [ref=e255]: "3"
+              - button "Generate 4 pages" [ref=e256]: "4"
+          - button "Submit generation prompt" [disabled]: Generate
+      - generic [ref=e257]:
+        - generic [ref=e258]:
+          - generic [ref=e259]:
+            - button "Switch preview resolution to Desktop L (1440px)" [ref=e260]:
+              - img [ref=e261]
+              - generic [ref=e263]: Desktop L
+              - generic [ref=e264]: "1440"
+            - button "Switch preview resolution to Desktop (1280px)" [ref=e265]:
+              - img [ref=e266]
+              - generic [ref=e268]: Desktop
+              - generic [ref=e269]: "1280"
+            - button "Switch preview resolution to Tablet (768px)" [ref=e270]:
+              - img [ref=e271]
+              - generic [ref=e273]: Tablet
+              - generic [ref=e274]: "768"
+            - button "Switch preview resolution to Mobile (390px)" [ref=e275]:
+              - img [ref=e276]
+              - generic [ref=e278]: Mobile
+              - generic [ref=e279]: "390"
+          - generic [ref=e280]:
+            - button "Open section refinement panel" [ref=e281]:
+              - img
+              - text: Refine
+            - button "Code and export actions" [ref=e282]:
+              - img
+              - text: Code
+              - img
+            - button "Open version history timeline" [ref=e283]:
+              - img
+              - text: History
+            - button "More studio actions" [ref=e284]:
+              - img
+        - generic [ref=e286]:
+          - generic [ref=e287]:
+            - button "TXT Document Hub — Home" [pressed] [ref=e289]:
+              - generic [ref=e290]: TXT Document Hub — Home
+            - generic [ref=e291]:
+              - group "Preview fit mode" [ref=e292]:
+                - button "Fit to width" [pressed] [ref=e293]: Width
+                - button "Fit whole page" [ref=e294]: Page
+              - generic "Quality score 96" [ref=e295]: Q96
+              - button "Refine TXT Document Hub — Home" [ref=e296]:
+                - img [ref=e297]
+              - button "Manage TXT Document Hub — Home" [ref=e299]:
+                - img [ref=e300]
+          - iframe [ref=e306]:
+            - generic [ref=f12e2]:
+              - complementary [ref=f12e3]:
+                - generic [ref=f12e4]:
+                  - generic [ref=f12e5]: T
+                  - generic [ref=f12e6]: tesss
+                - generic [ref=f12e7]: Menu
+                - generic [ref=f12e8] [cursor=pointer]:
+                  - img [ref=f12e10]
+                  - generic [ref=f12e13]: Dashboard
+                - generic [ref=f12e14] [cursor=pointer]:
+                  - img [ref=f12e16]
+                  - generic [ref=f12e17]: Analytics
+                - generic [ref=f12e18] [cursor=pointer]:
+                  - img [ref=f12e20]
+                  - generic [ref=f12e25]: Customers
+                - generic [ref=f12e26] [cursor=pointer]:
+                  - img [ref=f12e28]
+                  - generic [ref=f12e32]: Projects
+                - generic [ref=f12e33] [cursor=pointer]:
+                  - img [ref=f12e35]
+                  - generic [ref=f12e38]: Reports
+                - generic [ref=f12e39] [cursor=pointer]:
+                  - img [ref=f12e41]
+                  - generic [ref=f12e43]: Billing
+                - generic [ref=f12e44]: Workspace
+                - generic [ref=f12e45] [cursor=pointer]:
+                  - img [ref=f12e47]
+                  - generic [ref=f12e52]: Team
+                - generic [ref=f12e53] [cursor=pointer]:
+                  - img [ref=f12e55]
+                  - generic [ref=f12e58]: Settings
+                - generic [ref=f12e59] [cursor=pointer]:
+                  - img [ref=f12e61]
+                  - generic [ref=f12e63]: Help
+                - generic [ref=f12e65]:
+                  - strong [ref=f12e66]: Admin
+                  - text: Custom
+              - generic [ref=f12e67]:
+                - generic [ref=f12e68]:
+                  - generic [ref=f12e69]: TXT Document Hub — Dashboard · custom
+                  - generic [ref=f12e70]:
+                    - generic [ref=f12e71]:
+                      - img [ref=f12e73]
+                      - textbox "Search" [ref=f12e76]:
+                        - /placeholder: Search…
+                    - button "Notifications" [ref=f12e77] [cursor=pointer]:
+                      - img [ref=f12e79]
+                - main [ref=f12e82]:
+                  - generic [ref=f12e83]:
+                    - heading "TXT Document Hub — Dashboard" [level=1] [ref=f12e84]
+                    - paragraph [ref=f12e85]: Key metrics and recent activity
+                  - generic [ref=f12e86]:
+                    - generic [ref=f12e89]:
+                      - heading "Selamat Datang di Pusat Dokumen TXT" [level=1] [ref=f12e90]
+                      - paragraph [ref=f12e91]: Kelola 40+ file teks Anda dengan pencarian pintar, tag otomatis, dan ringkasan instan dalam satu dasbor.
+                      - generic [ref=f12e92]:
+                        - button "Unggah Dokumen Baru" [ref=f12e93] [cursor=pointer]
+                        - button "Impor Folder" [ref=f12e94] [cursor=pointer]
+                        - button "Lihat Panduan" [ref=f12e95] [cursor=pointer]
+                    - generic [ref=f12e99]:
+                      - article [ref=f12e100]:
+                        - generic [ref=f12e101]:
+                          - generic [ref=f12e102]: Total Dokumen
+                          - img [ref=f12e104]
+                        - strong [ref=f12e107]: "248"
+                        - generic [ref=f12e108]: ▴ +12 minggu ini
+                        - img [ref=f12e109]
+                      - article [ref=f12e112]:
+                        - generic [ref=f12e113]:
+                          - generic [ref=f12e114]: Kata Tertulis
+                          - img [ref=f12e116]
+                        - strong [ref=f12e119]: 1.4M
+                        - generic [ref=f12e120]: ▴ +8.2% bulan ini
+                        - img [ref=f12e121]
+                      - article [ref=f12e124]:
+                        - generic [ref=f12e125]:
+                          - generic [ref=f12e126]: Folder Aktif
+                          - img [ref=f12e128]
+                        - strong [ref=f12e132]: "12"
+                        - generic [ref=f12e133]: ▴ 3 folder baru
+                        - img [ref=f12e134]
+                      - article [ref=f12e137]:
+                        - generic [ref=f12e138]:
+                          - generic [ref=f12e139]: Tag Diterapkan
+                          - img [ref=f12e141]
+                        - strong [ref=f12e143]: "87"
+                        - generic [ref=f12e144]: ▴ +14 minggu ini
+                        - img [ref=f12e145]
+                      - article [ref=f12e148]:
+                        - generic [ref=f12e149]:
+                          - generic [ref=f12e150]: Penyimpanan
+                          - img [ref=f12e152]
+                        - strong [ref=f12e155]: 6.4 MB
+                        - generic [ref=f12e156]: ▴ dari 50 MB
+                        - img [ref=f12e157]
+                      - article [ref=f12e160]:
+                        - generic [ref=f12e161]:
+                          - generic [ref=f12e162]: Rata-rata Dibaca
+                          - img [ref=f12e164]
+                        - strong [ref=f12e167]: 4.2 mnt
+                        - generic [ref=f12e168]: ▾ -0.3 mnt
+                        - img [ref=f12e169]
+                    - generic [ref=f12e173]:
+                      - generic [ref=f12e174]:
+                        - heading "Aktivitas Penulisan 40 Dokumen Teratas" [level=2] [ref=f12e175]
+                        - generic [ref=f12e176]: area
+                      - img "line chart" [ref=f12e178]:
+                        - generic [ref=f12e179]: "0"
+                        - generic [ref=f12e180]: "294.25"
+                        - generic [ref=f12e181]: "588.5"
+                        - generic [ref=f12e182]: "882.75"
+                        - generic [ref=f12e183]: 1.2k
+                        - generic [ref=f12e187]: 1.2k
+                    - generic [ref=f12e189]:
+                      - heading "Aktivitas Terbaru" [level=2] [ref=f12e190]
+                      - list [ref=f12e191]:
+                        - listitem [ref=f12e192]:
+                          - generic [ref=f12e194]:
+                            - strong [ref=f12e195]: Dokumen diedit
+                            - generic [ref=f12e196]: Catatan-Mingguan-12.txt • 5 menit lalu
+                            - generic [ref=f12e197]: Selesai
+                        - listitem [ref=f12e198]:
+                          - generic [ref=f12e200]:
+                            - strong [ref=f12e201]: Tag diterapkan
+                            - generic [ref=f12e202]: draft, penting • 1 jam lalu
+                            - generic [ref=f12e203]: Otomatis
+                        - listitem [ref=f12e204]:
+                          - generic [ref=f12e206]:
+                            - strong [ref=f12e207]: Folder dibuat
+                            - generic [ref=f12e208]: Arsip 2024 • 3 jam lalu
+                            - generic [ref=f12e209]: Selesai
+                        - listitem [ref=f12e210]:
+                          - generic [ref=f12e212]:
+                            - strong [ref=f12e213]: Dokumen diunggah
+                            - generic [ref=f12e214]: Rapat-Q3.txt • kemarin
+                            - generic [ref=f12e215]: 2.1 KB
+                        - listitem [ref=f12e216]:
+                          - generic [ref=f12e218]:
+                            - strong [ref=f12e219]: Versi dipulihkan
+                            - generic [ref=f12e220]: Ide-Produk-2024.txt • 2 hari lalu
+                            - generic [ref=f12e221]: v3 → v2
+                    - generic [ref=f12e223]:
+                      - heading "Fitur Unggulan Pengelola TXT" [level=2] [ref=f12e224]
+                      - generic [ref=f12e225]:
+                        - article [ref=f12e226]:
+                          - img [ref=f12e228]
+                          - strong [ref=f12e231]: Pencarian Teks Penuh
+                          - paragraph [ref=f12e232]: Cari kata atau frasa di seluruh 40+ dokumen dalam milidetik.
+                        - article [ref=f12e233]:
+                          - img [ref=f12e235]
+                          - strong [ref=f12e237]: Auto-Tag Cerdas
+                          - paragraph [ref=f12e238]: Sistem memberi label otomatis berdasarkan topik dan frekuensi kata.
+                        - article [ref=f12e239]:
+                          - img [ref=f12e241]
+                          - strong [ref=f12e245]: Riwayat Versi
+                          - paragraph [ref=f12e246]: Lihat dan pulihkan versi sebelumnya hingga 30 hari ke belakang.
+                        - article [ref=f12e247]:
+                          - img [ref=f12e249]
+                          - strong [ref=f12e252]: Ekspor Multi-Format
+                          - paragraph [ref=f12e253]: Konversi TXT ke PDF, Markdown, atau DOCX dengan satu klik.
+                        - article [ref=f12e254]:
+                          - img [ref=f12e256]
+                          - strong [ref=f12e258]: Enkripsi Lokal
+                          - paragraph [ref=f12e259]: Dokumen sensitif dienkripsi AES-256 langsung di perangkat Anda.
+                        - article [ref=f12e260]:
+                          - img [ref=f12e262]
+                          - strong [ref=f12e267]: Kolaborasi Real-time
+                          - paragraph [ref=f12e268]: Edit bersamaan dengan tim dan lihat perubahan secara langsung.
+                    - generic [ref=f12e270]:
+                      - generic [ref=f12e271]:
+                        - img [ref=f12e273]
+                        - textbox "Search" [ref=f12e276]:
+                          - /placeholder: Cari di 248 dokumen teks...
+                      - generic [ref=f12e277]:
+                        - generic [ref=f12e278]: Semua Folder
+                        - generic [ref=f12e279]: "Tag: penting"
+                        - generic [ref=f12e280]: "Tag: draft"
+                        - generic [ref=f12e281]: Minggu ini
+                        - generic [ref=f12e282]: Bulan ini
+                      - button "Filter Lanjutan" [ref=f12e283] [cursor=pointer]
+                    - generic [ref=f12e285]:
+                      - heading "Daftar 40+ Dokumen TXT Aktif" [level=2] [ref=f12e286]
+                      - table [ref=f12e288]:
+                        - rowgroup [ref=f12e289]:
+                          - row "Nama File Ukuran Kata Tag Diubah Status" [ref=f12e290]:
+                            - columnheader "Nama File" [ref=f12e291]
+                            - columnheader "Ukuran" [ref=f12e292]
+                            - columnheader "Kata" [ref=f12e293]
+                            - columnheader "Tag" [ref=f12e294]
+                            - columnheader "Diubah" [ref=f12e295]
+                            - columnheader "Status" [ref=f12e296]
+                        - rowgroup [ref=f12e297]:
+                          - row "Catatan-Mingguan-12.txt 4.2 KB 612 penting, mingguan 5 menit lalu Aktif" [ref=f12e298]:
+                            - cell "Catatan-Mingguan-12.txt" [ref=f12e299]
+                            - cell "4.2 KB" [ref=f12e300]
+                            - cell "612" [ref=f12e301]
+                            - cell "penting, mingguan" [ref=f12e302]
+                            - cell "5 menit lalu" [ref=f12e303]
+                            - cell "Aktif" [ref=f12e304]:
+                              - generic [ref=f12e305]: Aktif
+                          - row "Rapat-Q3-Ringkasan.txt 8.1 KB 1,204 rapat, q3 1 jam lalu Aktif" [ref=f12e306]:
+                            - cell "Rapat-Q3-Ringkasan.txt" [ref=f12e307]
+                            - cell "8.1 KB" [ref=f12e308]
+                            - cell "1,204" [ref=f12e309]
+                            - cell "rapat, q3" [ref=f12e310]
+                            - cell "1 jam lalu" [ref=f12e311]
+                            - cell "Aktif" [ref=f12e312]:
+                              - generic [ref=f12e313]: Aktif
+                          - row "Ide-Produk-2024.txt 12.7 KB 1,892 draft, ide 3 jam lalu Draft" [ref=f12e314]:
+                            - cell "Ide-Produk-2024.txt" [ref=f12e315]
+                            - cell "12.7 KB" [ref=f12e316]
+                            - cell "1,892" [ref=f12e317]
+                            - cell "draft, ide" [ref=f12e318]:
+                              - generic [ref=f12e319]: draft, ide
+                            - cell "3 jam lalu" [ref=f12e320]
+                            - cell "Draft" [ref=f12e321]:
+                              - generic [ref=f12e322]: Draft
+                          - row "Arsip-Log-Server.txt 23.4 KB 3,451 log, arsip Kemarin Arsip" [ref=f12e323]:
+                            - cell "Arsip-Log-Server.txt" [ref=f12e324]
+                            - cell "23.4 KB" [ref=f12e325]
+                            - cell "3,451" [ref=f12e326]
+                            - cell "log, arsip" [ref=f12e327]
+                            - cell "Kemarin" [ref=f12e328]
+                            - cell "Arsip" [ref=f12e329]:
+                              - generic [ref=f12e330]: Arsip
+                          - row "Resep-Keluarga.txt 6.8 KB 987 pribadi 2 hari lalu Aktif" [ref=f12e331]:
+                            - cell "Resep-Keluarga.txt" [ref=f12e332]
+                            - cell "6.8 KB" [ref=f12e333]
+                            - cell "987" [ref=f12e334]
+                            - cell "pribadi" [ref=f12e335]
+                            - cell "2 hari lalu" [ref=f12e336]
+                            - cell "Aktif" [ref=f12e337]:
+                              - generic [ref=f12e338]: Aktif
+                          - row "Daftar-Belanja.txt 1.2 KB 148 pribadi, belanja 3 hari lalu Aktif" [ref=f12e339]:
+                            - cell "Daftar-Belanja.txt" [ref=f12e340]
+                            - cell "1.2 KB" [ref=f12e341]
+                            - cell "148" [ref=f12e342]
+                            - cell "pribadi, belanja" [ref=f12e343]
+                            - cell "3 hari lalu" [ref=f12e344]
+                            - cell "Aktif" [ref=f12e345]:
+                              - generic [ref=f12e346]: Aktif
+                          - row "Surat-Lamaran.txt 3.5 KB 524 penting, kerja 4 hari lalu Draft" [ref=f12e347]:
+                            - cell "Surat-Lamaran.txt" [ref=f12e348]
+                            - cell "3.5 KB" [ref=f12e349]
+                            - cell "524" [ref=f12e350]
+                            - cell "penting, kerja" [ref=f12e351]
+                            - cell "4 hari lalu" [ref=f12e352]
+                            - cell "Draft" [ref=f12e353]:
+                              - generic [ref=f12e354]: Draft
+                          - row "Catatan-Baca-Buku.txt 15.9 KB 2,367 review, buku 1 minggu lalu Aktif" [ref=f12e355]:
+                            - cell "Catatan-Baca-Buku.txt" [ref=f12e356]
+                            - cell "15.9 KB" [ref=f12e357]
+                            - cell "2,367" [ref=f12e358]
+                            - cell "review, buku" [ref=f12e359]:
+                              - generic [ref=f12e360]: review, buku
+                            - cell "1 minggu lalu" [ref=f12e361]
+                            - cell "Aktif" [ref=f12e362]:
+                              - generic [ref=f12e363]: Aktif
+                    - generic [ref=f12e365]:
+                      - heading "Utilisasi Penyimpanan per Kategori" [level=2] [ref=f12e366]
+                      - generic [ref=f12e367]:
+                        - generic [ref=f12e369]:
+                          - generic [ref=f12e370]: Catatan Pribadi
+                          - strong [ref=f12e371]: 32 pct dari total
+                        - generic [ref=f12e375]:
+                          - generic [ref=f12e376]: Dokumen Kerja
+                          - strong [ref=f12e377]: 48 pct dari total
+                        - generic [ref=f12e381]:
+                          - generic [ref=f12e382]: Arsip & Log
+                          - strong [ref=f12e383]: 12 pct dari total
+                        - generic [ref=f12e387]:
+                          - generic [ref=f12e388]: Riset & Referensi
+                          - strong [ref=f12e389]: 8 pct dari total
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e10] [cursor=pointer]:
+    - img [ref=e11]
+  - alert [ref=e14]

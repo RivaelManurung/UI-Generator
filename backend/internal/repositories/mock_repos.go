@@ -12,7 +12,7 @@ import (
 	"github.com/kreasinusantara/ui-generator-backend/internal/platform/metrics"
 )
 
-type MockTxManager struct{
+type MockTxManager struct {
 	mu sync.Mutex
 }
 
@@ -276,6 +276,20 @@ func (r *MockPageVersionRepository) ListOwnedByPage(ctx context.Context, userID 
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return r.versions[pageID], nil
+}
+
+func (r *MockPageVersionRepository) UpdateGeneratedCode(ctx context.Context, versionID string, code string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for pageID, vs := range r.versions {
+		for i := range vs {
+			if vs[i].ID == versionID {
+				r.versions[pageID][i].GeneratedCode = code
+				return nil
+			}
+		}
+	}
+	return nil
 }
 
 func (r *MockPageVersionRepository) FindOwned(ctx context.Context, userID string, pageID string, versionID string) (domain.PageVersion, error) {

@@ -28,7 +28,6 @@ import (
 	"github.com/kreasinusantara/ui-generator-backend/internal/schema"
 )
 
-
 const defaultUserID = "user_demo"
 
 const maxPromptLength = 2000
@@ -113,7 +112,6 @@ type GenerateResult struct {
 	Wallet  domain.CreditWallet  `json:"wallet"`
 }
 
-
 type StudioService struct {
 	mu              sync.RWMutex
 	jwtSecret       string
@@ -121,23 +119,23 @@ type StudioService struct {
 	refreshTokenTTL time.Duration
 
 	// Repositories
-	users             repositories.UserRepository
-	refreshTokens     repositories.RefreshTokenRepository
-	projects          repositories.ProjectRepository
-	pages             repositories.PageRepository
-	versions          repositories.PageVersionRepository
-	jobs              repositories.GenerationJobRepository
-	wallets           repositories.CreditWalletRepository
-	transactions      repositories.CreditTransactionRepository
-	themesRepo        repositories.ThemeRepository
-	templatesRepo     repositories.TemplateRepository
-	auditLogs         repositories.AuditLogRepository
-	idempotency       repositories.IdempotencyKeyRepository
-	tx                repositories.TxManager
-	queueProducer     *queue.Producer
-	aiProvider        ai.Provider
-	redisClient       *redis.Client
-	pool              *pgxpool.Pool
+	users         repositories.UserRepository
+	refreshTokens repositories.RefreshTokenRepository
+	projects      repositories.ProjectRepository
+	pages         repositories.PageRepository
+	versions      repositories.PageVersionRepository
+	jobs          repositories.GenerationJobRepository
+	wallets       repositories.CreditWalletRepository
+	transactions  repositories.CreditTransactionRepository
+	themesRepo    repositories.ThemeRepository
+	templatesRepo repositories.TemplateRepository
+	auditLogs     repositories.AuditLogRepository
+	idempotency   repositories.IdempotencyKeyRepository
+	tx            repositories.TxManager
+	queueProducer *queue.Producer
+	aiProvider    ai.Provider
+	redisClient   *redis.Client
+	pool          *pgxpool.Pool
 }
 
 func NewStudioService() *StudioService {
@@ -219,7 +217,10 @@ func NewStudioServiceWithConfig(cfg config.Config) *StudioService {
 		}
 		s.pool = pool
 		seedDB(ctx, pool)
-		s.seedAuthUsersDB(ctx)
+		// Demo/admin accounts are a dev convenience only — never seed them in production.
+		if !strings.EqualFold(cfg.Environment, "production") {
+			s.seedAuthUsersDB(ctx)
+		}
 		s.reconcileStaleJobs(ctx)
 
 		s.users = repositories.NewPostgresUserRepository(pool)
@@ -345,8 +346,6 @@ func seedDB(ctx context.Context, pool *pgxpool.Pool) {
 	}
 }
 
-
-
 func (s *StudioService) ListProjects(ctx context.Context) ([]domain.Project, error) {
 	return s.ListProjectsForUser(ctx, defaultUserID)
 }
@@ -451,7 +450,6 @@ func (s *StudioService) DeleteProjectForUser(ctx context.Context, userID string,
 	return s.projects.SoftDeleteOwned(ctx, userID, projectID)
 }
 
-
 func (s *StudioService) CreatePage(ctx context.Context, projectID string, input CreatePageInput) (domain.Page, error) {
 	return s.CreatePageForUser(ctx, defaultUserID, projectID, input)
 }
@@ -555,7 +553,6 @@ func (s *StudioService) ListVersionsForUser(ctx context.Context, userID string, 
 	}
 	return s.versions.ListOwnedByPage(ctx, userID, pageID)
 }
-
 
 func (s *StudioService) Generate(ctx context.Context, pageID string, requestID string, input GenerateInput) (GenerateResult, error) {
 	return s.GenerateForUser(ctx, defaultUserID, pageID, requestID, input)
@@ -1145,11 +1142,49 @@ func (s *StudioService) AdminMetricsSummary(ctx context.Context) (map[string]int
 	return summary, nil
 }
 
-
+// scoreSchema rates a page on real richness — section density, TYPE variety,
+// whether charts carry actual data, table depth, and KPI/sparkline completeness —
+// not just the raw section count (which rewarded padding with empty panels).
 func scoreSchema(page schema.PageSchema) float64 {
-	score := 78.0 + float64(len(page.Sections))*4.5
-	if score > 96 {
-		return 96
+	score := 60.0
+	types := map[string]bool{}
+	for _, s := range page.Sections {
+		types[s.Type] = true
+		score += 3.0 // density
+		switch s.Type {
+		case "chartPanel":
+			if len(s.Series) > 0 || len(s.Data) > 0 {
+				score += 5 // a chart driven by real data
+			} else {
+				score += 1
+			}
+		case "dataTable":
+			if len(s.Rows) >= 5 {
+				score += 4
+			} else {
+				score += 1.5
+			}
+		case "statsGrid":
+			n := len(s.Items)
+			if n > 4 {
+				n = 4
+			}
+			score += float64(n)
+			for _, it := range s.Items {
+				if len(it.Spark) > 0 {
+					score += 0.5
+				}
+			}
+		case "hero", "gallery", "featureGrid", "mapPanel", "kanbanBoard", "progressList":
+			score += 2 // richer, image/visual-forward sections
+		}
+	}
+	score += float64(len(types)) * 1.6 // reward variety
+	if score > 99 {
+		return 99
+	}
+	if score < 60 {
+		return 60
 	}
 	return score
 }
@@ -1256,7 +1291,6 @@ func (s *StudioService) themeExists(ctx context.Context, slug string) bool {
 	}
 	return false
 }
-
 
 func fallback(value, fallbackValue string) string {
 	if strings.TrimSpace(value) == "" {

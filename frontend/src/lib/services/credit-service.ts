@@ -1,4 +1,10 @@
-import { CreditBalance, CreditTransaction } from "@/types/credit";
+import {
+  CreditBalance,
+  CreditTransaction,
+  CreditPackage,
+  CheckoutResult,
+  PaymentStatus,
+} from "@/types/credit";
 import { http } from "@/lib/api/http";
 
 export const creditService = {
@@ -15,15 +21,25 @@ export const creditService = {
     return result.cost;
   },
 
-  async purchaseCredits(amount: number): Promise<CreditBalance> {
-    return http.post<CreditBalance>("/credits/purchase", { amount });
+  async deductCredits(amount: number, description: string): Promise<boolean> {
+    const result = await http.post<{ success: boolean }>("/credits/deduct", { amount, description });
+    return result.success;
   },
 
-  async deductCredits(amount: number, description: string): Promise<boolean> {
-    const result = await http.post<{ success: boolean }>("/credits/deduct", {
-      amount,
-      description,
-    });
-    return result.success;
+  // ---- Top-up via Midtrans ------------------------------------------------
+
+  /** Purchasable credit packs (pricing source of truth, server-defined). */
+  async listPackages(): Promise<CreditPackage[]> {
+    return http.get<CreditPackage[]>("/credit-packages");
+  },
+
+  /** Start a payment for a package; returns a Midtrans Snap token. */
+  async checkout(packageSlug: string): Promise<CheckoutResult> {
+    return http.post<CheckoutResult>("/payments/checkout", { packageSlug }, { idempotent: true });
+  },
+
+  /** Read an order's status (the server reconciles against Midtrans if pending). */
+  async getPayment(orderId: string): Promise<PaymentStatus> {
+    return http.get<PaymentStatus>(`/payments/${orderId}`);
   },
 };

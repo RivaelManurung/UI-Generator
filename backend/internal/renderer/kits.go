@@ -64,19 +64,27 @@ func generateAntd(page schema.PageSchema) string {
 			b.WriteString(fmt.Sprintf("        <Card title=\"%s\">\n", escape(s.Title)))
 			b.WriteString("          <Table pagination={false} size=\"middle\"\n")
 			b.WriteString("            columns={[")
-			for _, c := range s.Columns {
-				b.WriteString(fmt.Sprintf("{ title: \"%s\", dataIndex: \"%s\" }, ", escape(c), escape(strings.ToLower(c))))
+			for ci, c := range s.Columns {
+				b.WriteString(fmt.Sprintf("{ title: \"%s\", dataIndex: \"c%d\" }, ", escape(c), ci))
 			}
 			b.WriteString("]}\n")
-			b.WriteString("            dataSource={[]} />\n")
+			b.WriteString("            dataSource={[")
+			for ri, row := range s.Rows {
+				b.WriteString(fmt.Sprintf("{ key: %d", ri))
+				for ci, cell := range row {
+					b.WriteString(fmt.Sprintf(", c%d: \"%s\"", ci, escape(cell)))
+				}
+				b.WriteString(" }, ")
+			}
+			b.WriteString("]} />\n")
 			b.WriteString("        </Card>\n")
 		case "chartPanel":
 			b.WriteString(fmt.Sprintf("        <Card title=\"%s\">\n", escape(s.Title)))
-			b.WriteString("          <div style={{ height: 220, background: \"linear-gradient(180deg,#e6f4ff,#fff)\", borderRadius: 8 }} />\n")
+			writeKitChart(&b, s)
 			b.WriteString("        </Card>\n")
 		default:
 			b.WriteString(fmt.Sprintf("        <Card title=\"%s\">\n", escape(sectionTitle(s))))
-			b.WriteString(fmt.Sprintf("          <Text type=\"secondary\">%s section</Text>\n", escape(s.Type)))
+			writeKitContent(&b, s)
 			b.WriteString("        </Card>\n")
 		}
 	}
@@ -125,11 +133,12 @@ func generateMui(page schema.PageSchema) string {
 		case "chartPanel":
 			b.WriteString("        <Card variant=\"outlined\"><CardContent>\n")
 			b.WriteString(fmt.Sprintf("          <Typography variant=\"subtitle1\">%s</Typography>\n", escape(s.Title)))
-			b.WriteString("          <Box sx={{ height: 220, mt: 2, borderRadius: 1, background: \"linear-gradient(180deg,#e3f2fd,#fff)\" }} />\n")
+			writeKitChart(&b, s)
 			b.WriteString("        </CardContent></Card>\n")
 		default:
 			b.WriteString("        <Card variant=\"outlined\"><CardContent>\n")
 			b.WriteString(fmt.Sprintf("          <Typography variant=\"subtitle1\">%s</Typography>\n", escape(sectionTitle(s))))
+			writeKitContent(&b, s)
 			b.WriteString("        </CardContent></Card>\n")
 		}
 	}
@@ -176,11 +185,12 @@ func generateChakra(page schema.PageSchema) string {
 		case "chartPanel":
 			b.WriteString("        <Card><CardBody>\n")
 			b.WriteString(fmt.Sprintf("          <Heading size=\"sm\">%s</Heading>\n", escape(s.Title)))
-			b.WriteString("          <Box h=\"220px\" mt={4} borderRadius=\"md\" bgGradient=\"linear(to-b, teal.50, white)\" />\n")
+			writeKitChart(&b, s)
 			b.WriteString("        </CardBody></Card>\n")
 		default:
 			b.WriteString("        <Card><CardBody>\n")
 			b.WriteString(fmt.Sprintf("          <Heading size=\"sm\">%s</Heading>\n", escape(sectionTitle(s))))
+			writeKitContent(&b, s)
 			b.WriteString("        </CardBody></Card>\n")
 		}
 	}
@@ -193,4 +203,55 @@ func sectionTitle(s schema.Section) string {
 		return s.Title
 	}
 	return title(s.Type)
+}
+
+// writeKitChart renders real, data-driven bars (from the schema) inside a kit
+// card — replacing the old fake gradient box so exported library code shows
+// actual numbers, matching the preview.
+func writeKitChart(b *strings.Builder, s schema.Section) {
+	vals := chartSeries(s)
+	maxV := 1.0
+	for _, v := range vals {
+		if v > maxV {
+			maxV = v
+		}
+	}
+	b.WriteString("          <div style={{ display: \"flex\", alignItems: \"flex-end\", gap: 6, height: 180, marginTop: 12 }}>\n")
+	for _, v := range vals {
+		h := int(v / maxV * 100)
+		if h < 4 {
+			h = 4
+		}
+		b.WriteString(fmt.Sprintf("            <div style={{ flex: 1, height: \"%d%%\", background: \"#3b82f6\", borderRadius: \"4px 4px 0 0\" }} />\n", h))
+	}
+	b.WriteString("          </div>\n")
+}
+
+// writeKitContent renders a section's DATA as library-agnostic JSX (works inside
+// any kit's Card children) so no section type renders as an empty card — items,
+// fields, rows, and a primary action are all surfaced.
+func writeKitContent(b *strings.Builder, s schema.Section) {
+	if s.Subtitle != "" {
+		b.WriteString(fmt.Sprintf("          <p style={{ color: \"#64748b\", marginTop: 0 }}>%s</p>\n", escape(s.Subtitle)))
+	}
+	for _, it := range s.Items {
+		b.WriteString(fmt.Sprintf("          <div style={{ display: \"flex\", justifyContent: \"space-between\", gap: 12, padding: \"7px 0\", borderBottom: \"1px solid #eef2f7\" }}><span style={{ color: \"#475569\" }}>%s</span><strong>%s</strong></div>\n", escape(it.Label), escape(it.Value)))
+	}
+	for _, f := range s.Fields {
+		b.WriteString(fmt.Sprintf("          <label style={{ display: \"block\", margin: \"10px 0\" }}><span style={{ fontSize: 13, fontWeight: 600 }}>%s</span><input type=\"%s\" style={{ display: \"block\", width: \"100%%\", padding: 8, marginTop: 4, border: \"1px solid #e2e8f0\", borderRadius: 8 }} /></label>\n", escape(f.Label), escape(fallbackStr(f.Type, "text"))))
+	}
+	if len(s.Items) == 0 && len(s.Fields) == 0 && len(s.Rows) > 0 {
+		b.WriteString("          <div style={{ overflowX: \"auto\" }}><table style={{ width: \"100%\", borderCollapse: \"collapse\", fontSize: 14 }}><tbody>\n")
+		for _, row := range s.Rows {
+			b.WriteString("            <tr>")
+			for _, cell := range row {
+				b.WriteString(fmt.Sprintf("<td style={{ padding: \"8px 10px\", borderBottom: \"1px solid #eef2f7\" }}>%s</td>", escape(cell)))
+			}
+			b.WriteString("</tr>\n")
+		}
+		b.WriteString("          </tbody></table></div>\n")
+	}
+	if s.PrimaryAction != "" {
+		b.WriteString(fmt.Sprintf("          <button style={{ marginTop: 12, padding: \"9px 16px\", border: 0, borderRadius: 8, background: \"#2563eb\", color: \"#fff\", fontWeight: 600 }}>%s</button>\n", escape(s.PrimaryAction)))
+	}
 }

@@ -3,14 +3,12 @@
 import {
   ArrowDownLeft,
   ArrowUpRight,
-  CreditCard,
   RotateCcw,
 } from "lucide-react";
-import { toast } from "sonner";
 
 import { AppShell } from "@/components/layout/app-shell";
+import { PricingPlans } from "@/components/pricing/pricing-plans";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -52,12 +50,12 @@ function typeBadgeVariant(type: CreditTransaction["type"]): "outline" | "seconda
 
 const statusStyles: Record<CreditTransaction["status"], string> = {
   succeeded: "bg-secondary text-secondary-foreground",
-  pending: "bg-secondary text-secondary-foreground",
+  pending: "bg-warning-bg text-warning-foreground",
   failed: "bg-destructive/10 text-destructive",
 };
 
 export default function BillingPage() {
-  const { balance, purchaseCredits, loading: balanceLoading } = useCreditBalance();
+  const { balance, loading: balanceLoading, refresh: refreshBalance } = useCreditBalance();
   const { transactions, loading: txLoading } = useCreditTransactions();
 
   const usedPercent =
@@ -65,29 +63,9 @@ export default function BillingPage() {
       ? Math.min(100, Math.round((balance.usedThisMonth / balance.monthlyLimit) * 100))
       : 0;
 
-  const handleTopUp = async () => {
-    try {
-      await purchaseCredits(100);
-      toast.success("Added 100 credits to your balance.");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Top up failed");
-    }
-  };
-
-  const topUpAction = (
-    <Button size="sm" onClick={handleTopUp} disabled={balanceLoading}>
-      <CreditCard className="h-4 w-4" />
-      Top up
-    </Button>
-  );
-
   return (
-    <AppShell
-      title="Billing"
-      subtitle="Credits and transaction history."
-      actions={topUpAction}
-    >
-      <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+    <AppShell title="Billing" subtitle="Credits, top-ups, and transaction history.">
+      <div className="grid gap-5 md:grid-cols-2">
         <Card>
           <CardHeader>
             <CardDescription>Available credits</CardDescription>
@@ -118,26 +96,23 @@ export default function BillingPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <Progress value={usedPercent} className="bg-muted" />
+            <Progress value={usedPercent} className="bg-muted" aria-label="Monthly credit usage" />
             <p className="mt-2 text-xs text-muted-foreground tabular-nums">
               {usedPercent}% of monthly limit
             </p>
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader>
-            <CardDescription>Top up balance</CardDescription>
-            <CardTitle className="text-xl tracking-normal">Add credits instantly</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Button className="w-full bg-primary text-primary-foreground" onClick={handleTopUp} disabled={balanceLoading}>
-              <CreditCard className="h-4 w-4" />
-              Top up 100 credits
-            </Button>
-          </CardContent>
-        </Card>
       </div>
+
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle className="tracking-normal">Buy credits</CardTitle>
+          <CardDescription>One-time top-up packs — credits never expire. Paid securely via Midtrans.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <PricingPlans redirectTo="/app/billing" onPaid={refreshBalance} />
+        </CardContent>
+      </Card>
 
       <Card className="mt-6">
         <CardHeader>

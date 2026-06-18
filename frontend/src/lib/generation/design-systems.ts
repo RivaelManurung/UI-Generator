@@ -8,7 +8,6 @@ export interface DesignSystem {
   slug: string;
   name: string;
   library?: string;
-  cost?: number;
   status?: string;
   description?: string;
   fontUrl?: string;

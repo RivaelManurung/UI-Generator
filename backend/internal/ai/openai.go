@@ -38,9 +38,9 @@ func NewOpenAIProvider(apiKey, baseURL, model string) *OpenAIProvider {
 		model = "gpt-4o-mini"
 	}
 	return &OpenAIProvider{
-		apiKey:     apiKey,
-		baseURL:    strings.TrimRight(baseURL, "/"),
-		model:      model,
+		apiKey:  apiKey,
+		baseURL: strings.TrimRight(baseURL, "/"),
+		model:   model,
 		// Reasoning models (MiniMax-M3) generating a full multi-page app in one
 		// call can run well past 60s; the per-request ctx still bounds the inline
 		// route, so this only raises the ceiling for the background batch path.
@@ -81,7 +81,7 @@ func (p *OpenAIProvider) complete(ctx context.Context, systemPrompt, userPrompt 
 
 	reqBody := oaiRequest{
 		Model:       p.model,
-		Temperature: 0.7,  // varied output without tipping into malformed JSON (which forces a mock fallback)
+		Temperature: 0.7,   // varied output without tipping into malformed JSON (which forces a mock fallback)
 		MaxTokens:   32768, // multi-page JSON is long, and reasoning models (MiniMax-M3) also spend tokens on a <think> block — 8192 truncated 3-page output into broken JSON
 		Messages: []oaiMessage{
 			{Role: "system", Content: systemPrompt},
@@ -311,9 +311,12 @@ func appUserPrompt(request AppRequest) string {
 		fmt.Fprintf(&b, "%d) pageType=%q (default role: %s) — %s\n", i+1, p.PageType, p.Name, requirementsFor(p.PageType))
 	}
 	b.WriteString(`
-Each page object MUST be: {"pageType":"...","domain":"` + request.Domain + `","layout":"admin-sidebar","theme":"` + request.ThemeSlug + `","title":"...","sections":[ ... ]}
-Allowed section "type" values: statsGrid, chartPanel, dataTable, activityTimeline, filterToolbar, formSection, profileSummary, tabbedContent, notificationList, emptyState, actionFooter.
-- statsGrid.items[]: {label,value,trend} (4-6 items). chartPanel: {title,chartType:"bar|line|pie"}. dataTable: {title,columns[],rows[][]} (>=2 columns, >=5 realistic rows). filterToolbar: {searchPlaceholder,filters[],primaryAction}. formSection: {title,fields[{label,type}],submitLabel} (>=4 fields). actionFooter: {primaryAction,actions[]}. profileSummary: {title,entity,properties{}} (>=4 properties). activityTimeline: {title,items[{label,value}]} (>=3 items). EVERY section must be fully populated — NEVER emit an empty section.
+Each page object MUST be: {"pageType":"...","domain":"` + request.Domain + `","layout":"admin-sidebar | top-nav","theme":"` + request.ThemeSlug + `","title":"...","brand":"<product name>","nav":["<product-specific menu>"...],"sections":[ ... ]}
+- "brand": the product/app NAME from the brief (same on every page). "nav": 4-7 PRODUCT-SPECIFIC menu items derived from the brief (same on every page) — NEVER a generic ["Dashboard","Analytics","Customers","Projects","Reports"] list. "layout": pick "admin-sidebar" for data/ops apps or "top-nav" for portals/marketing/consumer apps (same on every page).
+Allowed section "type" values: statsGrid, chartPanel, dataTable, activityTimeline, filterToolbar, formSection, profileSummary, tabbedContent, notificationList, emptyState, actionFooter, progressList, kanbanBoard, calendarView, mapPanel, stepper, authForm. For a "login" pageType, use a single "authForm". Choose the components each page actually needs from the brief — do NOT repeat a fixed KPI+chart+table skeleton.
+- statsGrid.items[]: {label,value,trend,icon,spark:[6-12 numbers]} (4-6 items). The "spark" array is the metric's recent trend — make it agree with "trend" (rising if +, falling if -).
+- chartPanel: {title,chartType:"bar|line|area|donut|stacked",categories:[x-axis labels],series:[[numbers]]}. series is REQUIRED real data: one inner array per line/bar set (use ONE inner array for bar/line/area/donut, 2-3 for stacked/multi). categories.length MUST equal each series length. Use believable domain numbers, NOT round placeholders.
+- dataTable: {title,columns[],rows[][]} (>=2 columns, >=5 realistic rows; include at least one numeric column). filterToolbar: {searchPlaceholder,filters[],primaryAction}. formSection: {title,fields[{label,type}],submitLabel} (>=4 fields). actionFooter: {primaryAction,actions[]}. profileSummary: {title,entity,properties{}} (>=4 properties). activityTimeline: {title,items[{label,value}]} (>=3 items). progressList/stepper: {title,items[{label,value}]} (value is a % or short status). EVERY section must be fully populated — NEVER emit an empty section.
 - DENSITY: each page should have 4-6 populated sections so it feels like a real production screen, not a sparse demo.
 - "title" MUST be a short, specific module name taken from the brief (e.g. the sales / inventory / finance / HR area it represents) — NEVER a generic word like "Overview", "Dashboard", "Records", "Detail", or "Form". If the brief lists modules, use them as the page titles.
 - Write every label/metric/column/row in the SAME LANGUAGE as the brief.
@@ -445,7 +448,7 @@ func requirementsFor(pageType string) string {
 	case "analytics":
 		return `This is an "analytics" page: it MUST include "statsGrid" (with icons), "filterToolbar", "chartPanel", AND "dataTable". Add a second chartPanel or a "featureGrid" of insights for depth.`
 	case "login":
-		return `This is a "login" page: it MUST include a "formSection" AND an "actionFooter". A "hero" beside the form (image + headline) makes it feel premium.`
+		return `This is a "login" page: it MUST include an "authForm" (centered sign-in card). Set its title, subtitle, fields (email + password), primaryAction (e.g. "Sign in"), and actions (e.g. ["Forgot password?","Don't have an account? Sign up"]).`
 	default:
 		return `This is a "dashboard" page. For PRODUCTION density it MUST include ALL of: a "statsGrid" (4-6 KPI items, each with an icon), a "chartPanel", a "dataTable" (>=2 columns and >=5 realistic rows), AND an "activityTimeline" (>=3 items). Strongly consider opening with a "hero" and adding a "featureGrid" or "gallery" so the page feels rich and complete. Every section must be fully populated — NEVER emit an empty section.`
 	}
@@ -462,11 +465,15 @@ ThemeSlug: %q
 
 Rules:
 - Output a single JSON object, no markdown, no commentary.
-- "layout" must be "admin-sidebar".
+- "layout": choose the shell that fits the product — "admin-sidebar" for data/ops-heavy apps (dashboards, tables, CRMs), or "top-nav" for lighter portals, marketing, catalogs, or consumer apps. Pick deliberately from the brief; do NOT default to one.
+- "brand": the product/app NAME inferred from the brief (e.g. "Vaultstream", "MediTrack"), NOT a generic word.
+- "nav": 4-7 PRODUCT-SPECIFIC menu items for THIS product's primary navigation, derived from the brief — e.g. a fintech → ["Overview","Transactions","Cards","Payouts","Disputes","Settings"]; a clinic → ["Dashboard","Patients","Appointments","Doctors","Billing"]. NEVER a generic ["Dashboard","Analytics","Customers","Projects","Reports"] list.
+- DESIGN PER PROMPT: the section MIX, ORDER, and COMPOSITION must reflect THIS brief — two different briefs must NOT produce the same skeleton. Choose the components the product actually needs (a kanban tool leads with a board, an analytics tool with charts, a catalog with a gallery), not a fixed KPI+chart+table template.
 - Be GENEROUS and rich: use 4-7 sections of VARIED types so the page feels like a real, polished product screen (think Stitch / Linear / Vercel quality) — never a sparse 2-section skeleton.
-- "sections" use ONLY these "type" values: statsGrid, chartPanel, dataTable, activityTimeline, filterToolbar, formSection, profileSummary, tabbedContent, notificationList, emptyState, actionFooter, hero, gallery, featureGrid, pricingTable, testimonials, stepper, progressList, mapPanel, kanbanBoard, calendarView.
-- statsGrid: { "type":"statsGrid", "items":[{ "label":..., "value":..., "trend":..., "icon":"<icon>" }] } (>= 3 items). ALWAYS set "icon" on each item.
-- chartPanel: { "type":"chartPanel", "title":..., "chartType":"bar|line|pie" }.
+- "sections" use ONLY these "type" values: statsGrid, chartPanel, dataTable, activityTimeline, filterToolbar, formSection, profileSummary, tabbedContent, notificationList, emptyState, actionFooter, hero, gallery, featureGrid, pricingTable, testimonials, stepper, progressList, mapPanel, kanbanBoard, calendarView, authForm.
+- authForm: { "type":"authForm", "title":..., "subtitle":..., "fields":[{ "label":"Email","type":"email" },{ "label":"Password","type":"password" }], "primaryAction":"Sign in", "actions":["Forgot password?","Don't have an account? Sign up"] } — a centered SaaS sign-in card (logo, show-password toggle, remember me, and a "Continue with Google" button are added automatically). For a "login" pageType, use ONE authForm as the only section.
+- statsGrid: { "type":"statsGrid", "items":[{ "label":..., "value":..., "trend":..., "icon":"<icon>", "spark":[6-12 numbers] }] } (>= 3 items). ALWAYS set "icon". "spark" is the metric's recent trend series — make it rise when "trend" is positive and fall when negative.
+- chartPanel: { "type":"chartPanel", "title":..., "chartType":"bar|line|area|donut|stacked", "categories":[x-axis labels], "series":[[numbers]] }. "series" is REQUIRED real data (one inner array per line/bar; 2-3 inner arrays only for "stacked"). categories.length MUST equal each series length. Use believable, domain-specific numbers — never flat or round placeholders.
 - dataTable: { "type":"dataTable", "title":..., "columns":[...], "rows":[[...]] } (>= 2 columns, realistic example rows).
 - filterToolbar: { "type":"filterToolbar", "searchPlaceholder":..., "filters":[...], "primaryAction":... }.
 - formSection: { "type":"formSection", "title":..., "fields":[{ "label":..., "type":... }], "submitLabel":... }.
@@ -485,11 +492,11 @@ Rules:
 - ICONS: every statsGrid item and featureGrid item MUST include an "icon" chosen from: activity, users, user, calendar, wallet, dollar, credit-card, trending-up, trending-down, box, cart, bag, bar, line, pie, clock, bell, check, alert, settings, search, file, mail, home, star, heart, eye, layers, building, truck, zap, shield, globe, target, phone, link, tag, filter, download, upload, message, lock, gift, percent, refresh, briefcase, pin, edit, send. Pick the one that best fits the metric/feature.
 - chartPanel "chartType" can be: "bar", "line", "area", "pie", "donut", "stacked" (stacked bars), or "multiline" (multiple trend lines). Choose what fits the data.
 - IMAGES: hero, gallery, and profileSummary render real photos automatically. ALWAYS set concise "image" keywords (in English, 2-4 words describing the subject) on hero and on each gallery item so the photos are relevant to the brief. Prefer including at least one image-forward section (hero or gallery) when the brief suits it (landing, product, profile, catalog, media).
-- COMPOSITION: give EACH section a "span" of "full" | "two-thirds" | "half" | "third" so the page forms a real magazine-style grid, not one stacked column. Pair a "two-thirds" chart with a "third" side panel; put two "half" panels in a row; use "full" for hero, statsGrid, galleries and wide tables.
+- COMPOSITION: give EACH section a "span" of "full" | "two-thirds" | "half" | "third" so the page forms a real magazine-style grid, not one stacked column. VARY it for THIS brief: pair a "two-thirds" chart with a "third" side panel; put two "half" panels in a row; use "full" for hero, statsGrid, galleries and wide tables. Avoid making every section "full".
 - Tailor every label, metric, column, row, caption and icon to the brief and domain (realistic, specific data).
 
-Shape:
-{"pageType":%q,"domain":%q,"layout":"admin-sidebar","theme":%q,"title":"...","sections":[ ... ]}`,
+Shape (set "layout", "brand", "nav" yourself per the rules above):
+{"pageType":%q,"domain":%q,"layout":"admin-sidebar | top-nav","theme":%q,"title":"...","brand":"...","nav":["...","..."],"sections":[ ... ]}`,
 		request.Prompt, request.PageType, request.Domain, request.ThemeSlug,
 		requirementsFor(request.PageType),
 		request.PageType, request.Domain, request.ThemeSlug)

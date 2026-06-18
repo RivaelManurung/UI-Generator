@@ -14,8 +14,11 @@ import (
 	"time"
 
 	"github.com/kreasinusantara/ui-generator-backend/internal/ai"
+	"github.com/kreasinusantara/ui-generator-backend/internal/designsystem"
 	"github.com/kreasinusantara/ui-generator-backend/internal/domain"
 	"github.com/kreasinusantara/ui-generator-backend/internal/platform/apperrors"
+	"github.com/kreasinusantara/ui-generator-backend/internal/renderer"
+	"github.com/kreasinusantara/ui-generator-backend/internal/schema"
 )
 
 // FrontendService adapts the StudioService (page-centric, PRD component-registry
@@ -219,7 +222,9 @@ func (f *FrontendService) CreateProject(ctx context.Context, userID string, in C
 
 	status := normalizeStatus(in.Status)
 	if f.s.pool != nil {
-		_, _ = f.s.pool.Exec(ctx, "UPDATE projects SET status=$1 WHERE id=$2", status, proj.ID)
+		if _, err := f.s.pool.Exec(ctx, "UPDATE projects SET status=$1 WHERE id=$2", status, proj.ID); err != nil {
+			return ProjectDTO{}, err
+		}
 	}
 	proj.Status = status
 
@@ -260,7 +265,9 @@ func (f *FrontendService) UpdateProject(ctx context.Context, userID, projectID s
 	}
 
 	if in.Status != nil && f.s.pool != nil {
-		_, _ = f.s.pool.Exec(ctx, "UPDATE projects SET status=$1 WHERE id=$2", normalizeStatus(*in.Status), proj.ID)
+		if _, err := f.s.pool.Exec(ctx, "UPDATE projects SET status=$1 WHERE id=$2", normalizeStatus(*in.Status), proj.ID); err != nil {
+			return ProjectDTO{}, err
+		}
 	}
 	return f.projectDTO(ctx, userID, proj), nil
 }
@@ -510,19 +517,122 @@ func sanitizeAutoPlan(in []ai.AppPagePlan) []pagePlan {
 	return out
 }
 
-// resolveAppPlan decides the page set for a generation: an explicit page count
-// (manual override) uses the fixed plan; Auto asks the provider to choose, with a
-// heuristic fallback when the provider can't plan or the call fails.
-func (f *FrontendService) resolveAppPlan(ctx context.Context, in GenerateAppInput, domainName string) []pagePlan {
-	if !in.Auto && in.PageCount >= 1 {
-		return planPages(in.PageCount)
+// orderedDefaults is the fallback page set in priority order (distinct types),
+// used to pad a plan up to the requested count.
+var orderedDefaults = []pagePlan{
+	{Name: "Overview", PageType: "dashboard"},
+	{Name: "Records", PageType: "list"},
+	{Name: "Detail", PageType: "detail"},
+	{Name: "Create Form", PageType: "form"},
+	{Name: "Analytics", PageType: "analytics"},
+	{Name: "Sign In", PageType: "login"},
+}
+
+// padPlan tops up `base` to `count` DISTINCT-typed pages using orderedDefaults
+// (page reuse downstream keys on type, so types must be unique).
+func padPlan(base []pagePlan, count int) []pagePlan {
+	if count < 1 {
+		count = 1
 	}
+	seen := map[string]bool{}
+	out := make([]pagePlan, 0, count)
+	for _, p := range base {
+		if seen[p.PageType] {
+			continue
+		}
+		seen[p.PageType] = true
+		out = append(out, p)
+	}
+	for _, d := range orderedDefaults {
+		if len(out) >= count {
+			break
+		}
+		if seen[d.PageType] {
+			continue
+		}
+		seen[d.PageType] = true
+		out = append(out, d)
+	}
+	if len(out) > count {
+		out = out[:count]
+	}
+	if len(out) == 0 {
+		return planPages(count)
+	}
+	return out
+}
+
+// promptAwarePlan leads with the page type implied by the prompt (NormalizeIntent),
+// then fills with sensible distinct defaults — so a "login" brief yields a login
+// page even on the manual page-count path, not a blind dashboard.
+func promptAwarePlan(prompt, domainName string, count int) []pagePlan {
+	intent := ai.NormalizeIntent(prompt, "", domainName)
+	var base []pagePlan
+	if allowedPageTypes[intent.PageType] {
+		base = []pagePlan{{Name: defaultPageName(intent.PageType), PageType: intent.PageType}}
+	}
+	return padPlan(base, count)
+}
+
+func dedupePlan(in []pagePlan) []pagePlan {
+	seen := map[string]bool{}
+	out := make([]pagePlan, 0, len(in))
+	for _, p := range in {
+		if seen[p.PageType] {
+			continue
+		}
+		seen[p.PageType] = true
+		out = append(out, p)
+	}
+	return out
+}
+
+// resolveAppPlan decides the page set for a generation. The page TYPE is led by
+// the prompt's EXPLICIT intent (NormalizeIntent keyword match — e.g. "login" /
+// "sign in" → login), which is more reliable than the AI planner: the planner
+// often reframes a clear "login page" brief as an "auth control center DASHBOARD".
+// The planner only fills ADDITIONAL pages after that lead. So a login brief yields
+// a login page first, even with a manual page count of 1.
+func (f *FrontendService) resolveAppPlan(ctx context.Context, in GenerateAppInput, domainName string) []pagePlan {
+	intent := ai.NormalizeIntent(in.Prompt, "", domainName)
+	// A specific intent (anything but the generic "dashboard" default) is a strong
+	// signal the user asked for that exact screen — lead with it.
+	var lead []pagePlan
+	if intent.PageType != "" && intent.PageType != "dashboard" && allowedPageTypes[intent.PageType] {
+		lead = []pagePlan{{Name: defaultPageName(intent.PageType), PageType: intent.PageType}}
+	}
+
+	// Manual single page with a clear intent: honour it directly — no planner call,
+	// no chance for the planner to override it.
+	if !in.Auto && in.PageCount == 1 && len(lead) > 0 {
+		return lead
+	}
+
+	var aiPlan []pagePlan
 	if planner, ok := f.s.aiProvider.(ai.AppPlanner); ok {
 		if plans, err := planner.PlanApp(ctx, in.Prompt, domainName); err == nil && len(plans) > 0 {
-			return sanitizeAutoPlan(plans)
+			aiPlan = sanitizeAutoPlan(plans)
 		}
 	}
-	return planPages(3)
+
+	base := append(append([]pagePlan{}, lead...), aiPlan...)
+
+	if in.Auto || in.PageCount < 1 {
+		out := dedupePlan(base)
+		if len(out) == 0 {
+			return promptAwarePlan(in.Prompt, domainName, 3)
+		}
+		if len(out) > 5 {
+			out = out[:5]
+		}
+		return out
+	}
+
+	// Manual count: lead-first types, deduped, capped/padded to the requested count.
+	if len(base) == 0 {
+		return promptAwarePlan(in.Prompt, domainName, in.PageCount)
+	}
+	return padPlan(base, in.PageCount)
 }
 
 // GenerateMultiPage generates several coherent pages (dashboard, list, detail,
@@ -548,7 +658,7 @@ func (f *FrontendService) GenerateMultiPage(ctx context.Context, userID, project
 		page domain.Page
 	}
 	items := make([]planned, 0, in.PageCount)
-	for _, pp := range planPages(in.PageCount) {
+	for _, pp := range f.resolveAppPlan(ctx, in, project.Domain) {
 		slug := slugify(pp.Name)
 		page, ok := bySlug[slug]
 		if !ok {
@@ -656,6 +766,69 @@ func schemaOrEmpty(m map[string]interface{}) map[string]interface{} {
 		return map[string]interface{}{}
 	}
 	return m
+}
+
+func schemaFromMap(m map[string]interface{}) (schema.PageSchema, error) {
+	raw, err := json.Marshal(m)
+	if err != nil {
+		return schema.PageSchema{}, err
+	}
+	var ps schema.PageSchema
+	if err := json.Unmarshal(raw, &ps); err != nil {
+		return schema.PageSchema{}, err
+	}
+	return ps, nil
+}
+
+// SetProjectTheme switches a project's design system WITHOUT regenerating. The
+// stored schema is theme-independent, so it re-renders every page's code with the
+// new theme's tokens and rewrites generated_code IN PLACE (no new version, no AI
+// call, no credit). The live preview re-skins client-side from the same catalog.
+func (f *FrontendService) SetProjectTheme(ctx context.Context, userID, projectID, themeSlug string) error {
+	themeSlug = strings.TrimSpace(themeSlug)
+	if themeSlug == "" {
+		return apperrors.BadRequest("themeSlug is required")
+	}
+	project, err := f.s.projects.FindOwned(ctx, userID, projectID)
+	if err != nil {
+		return apperrors.NotFound("Project not found or you do not have access.")
+	}
+
+	// Resolve the renderer library: a visual design-system slug (shadcn,
+	// neobrutalism, glass, …) is passed straight through (token renderer); other
+	// slugs resolve to a component-library kit via the themes table.
+	library := themeSlug
+	if !designsystem.Has(themeSlug) {
+		library = f.s.themeLibrary(ctx, themeSlug)
+	}
+
+	pages, err := f.s.pages.ListByOwnedProject(ctx, userID, projectID)
+	if err != nil {
+		return err
+	}
+	for _, page := range pages {
+		if page.CurrentVersionID == "" {
+			continue
+		}
+		v, err := f.s.versions.FindOwned(ctx, userID, page.ID, page.CurrentVersionID)
+		if err != nil {
+			continue
+		}
+		ps, err := schemaFromMap(v.SchemaJSON)
+		if err != nil {
+			continue
+		}
+		code := renderer.Generate(ps, "tsx", library)
+		if err := f.s.versions.UpdateGeneratedCode(ctx, v.ID, code); err != nil {
+			return err
+		}
+	}
+
+	project.DefaultThemeSlug = themeSlug
+	if _, err := f.s.projects.UpdateOwned(ctx, userID, project); err != nil {
+		return err
+	}
+	return nil
 }
 
 type exportRoute struct {
@@ -1008,46 +1181,15 @@ func (f *FrontendService) PreviewCost(_ string) int {
 	return 1
 }
 
-func (f *FrontendService) PurchaseCredits(ctx context.Context, userID string, amount int) (BalanceDTO, error) {
-	if amount <= 0 {
-		return BalanceDTO{}, apperrors.Validation("amount must be positive")
-	}
-	if amount > 100000 {
-		return BalanceDTO{}, apperrors.Validation("amount exceeds the maximum top-up")
-	}
-	err := f.s.tx.WithTx(ctx, func(txCtx context.Context) error {
-		w, err := f.s.wallets.GetForUpdate(txCtx, userID)
-		if err != nil {
-			return err
-		}
-		w.Balance += amount
-		if err := f.s.wallets.Upsert(txCtx, w); err != nil {
-			return err
-		}
-		txID, err := newID()
-		if err != nil {
-			return err
-		}
-		_, err = f.s.transactions.Create(txCtx, domain.CreditTransaction{
-			ID:            txID,
-			UserID:        userID,
-			Type:          "topup",
-			Amount:        amount,
-			BalanceAfter:  w.Balance,
-			ReferenceType: "topup",
-			Description:   "Credit top-up",
-		})
-		return err
-	})
-	if err != nil {
-		return BalanceDTO{}, err
-	}
-	return f.CreditBalance(ctx, userID)
-}
-
 func (f *FrontendService) DeductCredits(ctx context.Context, userID string, amount int, description string) (bool, error) {
 	if amount <= 0 {
 		return false, apperrors.Validation("amount must be positive")
+	}
+	if amount > 1000 {
+		return false, apperrors.Validation("amount exceeds the maximum single deduction")
+	}
+	if len(description) > 200 {
+		description = description[:200]
 	}
 	err := f.s.tx.WithTx(ctx, func(txCtx context.Context) error {
 		w, err := f.s.wallets.GetForUpdate(txCtx, userID)
@@ -1409,8 +1551,14 @@ func (f *FrontendService) AdminUsers(ctx context.Context) ([]AdminUserDTO, error
 }
 
 func (f *FrontendService) AnalyticsKPIs(ctx context.Context) (map[string]interface{}, error) {
-	users, _ := f.s.users.List(ctx)
-	jobs, _ := f.s.jobs.ListForAdmin(ctx)
+	users, err := f.s.users.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	jobs, err := f.s.jobs.ListForAdmin(ctx)
+	if err != nil {
+		return nil, err
+	}
 	succeeded := 0
 	for _, j := range jobs {
 		if j.Status == "succeeded" {

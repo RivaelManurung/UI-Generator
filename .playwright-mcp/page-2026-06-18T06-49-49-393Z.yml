@@ -1,0 +1,225 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e55]:
+    - generic [ref=e58]:
+      - link "DashboardCraft Schema dashboard studio" [ref=e60] [cursor=pointer]:
+        - /url: /app
+        - img [ref=e62]
+        - generic [ref=e67]:
+          - generic [ref=e68]: DashboardCraft
+          - generic [ref=e69]: Schema dashboard studio
+      - generic [ref=e70]:
+        - generic [ref=e71]:
+          - generic [ref=e72]: Build
+          - list [ref=e73]:
+            - listitem [ref=e74]:
+              - link "Overview" [ref=e75] [cursor=pointer]:
+                - /url: /app
+                - img [ref=e76]
+                - generic [ref=e81]: Overview
+            - listitem [ref=e82]:
+              - link "Projects" [ref=e83] [cursor=pointer]:
+                - /url: /app/projects
+                - img [ref=e84]
+                - generic [ref=e86]: Projects
+            - listitem [ref=e87]:
+              - link "Studio" [ref=e88] [cursor=pointer]:
+                - /url: /app/studio/demo
+                - img [ref=e89]
+                - generic [ref=e93]: Studio
+            - listitem [ref=e94]:
+              - link "Templates" [ref=e95] [cursor=pointer]:
+                - /url: /app/templates
+                - img [ref=e96]
+                - generic [ref=e100]: Templates
+        - generic [ref=e101]:
+          - generic [ref=e102]: Manage
+          - list [ref=e103]:
+            - listitem [ref=e104]:
+              - link "Credits" [ref=e105] [cursor=pointer]:
+                - /url: /app/billing
+                - img [ref=e106]
+                - generic [ref=e108]: Credits
+            - listitem [ref=e109]:
+              - link "Settings" [ref=e110] [cursor=pointer]:
+                - /url: /app/settings
+                - img [ref=e111]
+                - generic [ref=e114]: Settings
+      - generic [ref=e115]:
+        - generic [ref=e116]:
+          - generic [ref=e117]:
+            - generic [ref=e118]: Credits
+            - generic [ref=e119]: 1,214 credits
+          - paragraph [ref=e122]: 101 / 500 used this month
+        - list [ref=e123]:
+          - listitem [ref=e124]:
+            - button "AD Admin User admin@example.com" [ref=e125]:
+              - generic [ref=e127]: AD
+              - generic [ref=e128]:
+                - generic [ref=e129]: Admin User
+                - generic [ref=e130]: admin@example.com
+              - img [ref=e131]
+      - button "Toggle Sidebar" [ref=e134]
+    - main [ref=e135]:
+      - generic [ref=e137]:
+        - button "Toggle Sidebar" [ref=e138]:
+          - img
+          - generic [ref=e139]: Toggle Sidebar
+        - generic [ref=e140]:
+          - heading "Overview" [level=1] [ref=e141]
+          - paragraph [ref=e142]: Workspace activity, generation, and credits.
+        - link "1,214 credits" [ref=e143] [cursor=pointer]:
+          - /url: /app/billing
+          - img [ref=e144]
+          - generic [ref=e146]: 1,214
+          - generic [ref=e147]: credits
+        - link "New generation" [ref=e148] [cursor=pointer]:
+          - /url: /app/studio/demo
+          - img
+          - text: New generation
+        - button "Notifications" [ref=e149]:
+          - img
+        - button "Account menu" [ref=e150]:
+          - generic [ref=e152]:
+            - img
+      - main [ref=e153]:
+        - generic [ref=e155]:
+          - generic [ref=e156]:
+            - paragraph [ref=e157]: Generate new interfaces, track credit usage, and pick up where you left off.
+            - generic [ref=e158]:
+              - link "New generation" [ref=e159] [cursor=pointer]:
+                - /url: /app/studio/demo
+              - link "Browse templates" [ref=e160] [cursor=pointer]:
+                - /url: /app/templates
+          - generic [ref=e161]:
+            - generic [ref=e163]:
+              - generic [ref=e164]:
+                - generic [ref=e165]:
+                  - paragraph [ref=e166]: Projects
+                  - paragraph [ref=e167]: "5"
+                - img [ref=e169]
+              - paragraph [ref=e171]: 5 projects in workspace
+            - generic [ref=e173]:
+              - generic [ref=e174]:
+                - generic [ref=e175]:
+                  - paragraph [ref=e176]: Credits available
+                  - paragraph [ref=e177]: 1,214
+                - img [ref=e179]
+              - paragraph [ref=e182]: Ready to spend on generation
+            - generic [ref=e184]:
+              - generic [ref=e185]:
+                - generic [ref=e186]:
+                  - paragraph [ref=e187]: Credits used this month
+                  - paragraph [ref=e188]: "101"
+                - img [ref=e190]
+              - paragraph [ref=e192]: of 500 monthly limit
+            - generic [ref=e194]:
+              - generic [ref=e195]:
+                - generic [ref=e196]:
+                  - paragraph [ref=e197]: Avg quality
+                  - paragraph [ref=e198]: "96"
+                - img [ref=e200]
+              - paragraph [ref=e203]: Average across projects
+          - generic [ref=e204]:
+            - generic [ref=e206]:
+              - generic [ref=e207]:
+                - generic [ref=e208]:
+                  - heading "Recent projects" [level=2] [ref=e209]
+                  - paragraph [ref=e210]: Your latest workspace projects and their status.
+                - link "New generation" [ref=e212] [cursor=pointer]:
+                  - /url: /app/studio/demo
+              - list [ref=e214]:
+                - listitem [ref=e215]:
+                  - link "Create an analytics dashboard with date filters, revenue cha custom draft Updated 6/17/2026" [ref=e216] [cursor=pointer]:
+                    - /url: /app/studio/273558bc-328e-920f-d62c-38958af89fda
+                    - generic [ref=e217]:
+                      - generic [ref=e218]:
+                        - paragraph [ref=e219]: Create an analytics dashboard with date filters, revenue cha
+                        - generic [ref=e220]: custom
+                        - generic [ref=e221]: draft
+                      - paragraph [ref=e222]: Updated 6/17/2026
+                    - img [ref=e223]
+                - listitem [ref=e226]:
+                  - link "Create an inventory management page with product grid, categ custom draft Updated 6/17/2026" [ref=e227] [cursor=pointer]:
+                    - /url: /app/studio/1f28b02a-bc4e-72cf-afad-0a422bdf1c1a
+                    - generic [ref=e228]:
+                      - generic [ref=e229]:
+                        - paragraph [ref=e230]: Create an inventory management page with product grid, categ
+                        - generic [ref=e231]: custom
+                        - generic [ref=e232]: draft
+                      - paragraph [ref=e233]: Updated 6/17/2026
+                    - img [ref=e234]
+                - listitem [ref=e237]:
+                  - link "Create an analytics dashboard with date filters, revenue cha custom draft Updated 6/17/2026" [ref=e238] [cursor=pointer]:
+                    - /url: /app/studio/66ec5472-1193-ffa0-85b7-8898d1e82a53
+                    - generic [ref=e239]:
+                      - generic [ref=e240]:
+                        - paragraph [ref=e241]: Create an analytics dashboard with date filters, revenue cha
+                        - generic [ref=e242]: custom
+                        - generic [ref=e243]: draft
+                      - paragraph [ref=e244]: Updated 6/17/2026
+                    - img [ref=e245]
+                - listitem [ref=e248]:
+                  - link "tes custom draft Updated 6/18/2026" [ref=e249] [cursor=pointer]:
+                    - /url: /app/studio/6f4786a7-5421-1d80-5bd6-bb6e05bb10ad
+                    - generic [ref=e250]:
+                      - generic [ref=e251]:
+                        - paragraph [ref=e252]: tes
+                        - generic [ref=e253]: custom
+                        - generic [ref=e254]: draft
+                      - paragraph [ref=e255]: Updated 6/18/2026
+                    - img [ref=e256]
+                - listitem [ref=e259]:
+                  - link "tesss custom draft Updated 6/18/2026" [ref=e260] [cursor=pointer]:
+                    - /url: /app/studio/e7e41761-5c50-3a49-279e-93a2c75b2ade
+                    - generic [ref=e261]:
+                      - generic [ref=e262]:
+                        - paragraph [ref=e263]: tesss
+                        - generic [ref=e264]: custom
+                        - generic [ref=e265]: draft
+                      - paragraph [ref=e266]: Updated 6/18/2026
+                    - img [ref=e267]
+            - generic [ref=e271]:
+              - generic [ref=e273]:
+                - heading "Credit wallet" [level=2] [ref=e274]
+                - paragraph [ref=e275]: Balance, monthly usage, and recent credit movement.
+              - generic [ref=e276]:
+                - generic [ref=e277]:
+                  - paragraph [ref=e278]: Available credits
+                  - paragraph [ref=e279]: 1,214
+                  - generic [ref=e280]:
+                    - generic [ref=e281]:
+                      - generic [ref=e282]: Used this month
+                      - generic [ref=e283]: 101 / 500
+                    - progressbar [ref=e284]
+                - generic [ref=e286]:
+                  - paragraph [ref=e287]: Recent transactions
+                  - list [ref=e288]:
+                    - listitem [ref=e289]:
+                      - generic [ref=e290]:
+                        - paragraph [ref=e291]: Page generation
+                        - paragraph [ref=e292]: 6/18/2026
+                      - generic [ref=e293]: "-1"
+                    - listitem [ref=e294]:
+                      - generic [ref=e295]:
+                        - paragraph [ref=e296]: Page generation
+                        - paragraph [ref=e297]: 6/18/2026
+                      - generic [ref=e298]: "-1"
+                    - listitem [ref=e299]:
+                      - generic [ref=e300]:
+                        - paragraph [ref=e301]: Page generation
+                        - paragraph [ref=e302]: 6/18/2026
+                      - generic [ref=e303]: "-1"
+                    - listitem [ref=e304]:
+                      - generic [ref=e305]:
+                        - paragraph [ref=e306]: Credit top-up
+                        - paragraph [ref=e307]: 6/18/2026
+                      - generic [ref=e308]: "+100"
+                    - listitem [ref=e309]:
+                      - generic [ref=e310]:
+                        - paragraph [ref=e311]: Credit top-up
+                        - paragraph [ref=e312]: 6/18/2026
+                      - generic [ref=e313]: "+100"
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e50] [cursor=pointer]:
+    - img [ref=e51]
+  - alert [ref=e54]

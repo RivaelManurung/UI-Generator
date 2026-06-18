@@ -142,7 +142,11 @@ func (f *FrontendService) StartGenerationBatch(ctx context.Context, userID, proj
 		// rather than slug, because each generation renames pages to the model's
 		// brief-specific titles — keying on slug would orphan the renamed page and
 		// create duplicates on every re-generation.
-		existing, _ := f.s.pages.ListByOwnedProject(genCtx, userID, projectID)
+		existing, lerr := f.s.pages.ListByOwnedProject(genCtx, userID, projectID)
+		if lerr != nil {
+			f.batches.finish(batch.ID, "failed", "could not load existing project pages")
+			return
+		}
 		pageIDByType := map[string]string{}
 		for _, p := range existing {
 			if _, ok := pageIDByType[p.PageType]; !ok {
@@ -170,7 +174,12 @@ func (f *FrontendService) StartGenerationBatch(ctx context.Context, userID, proj
 
 		// Fail fast if the wallet can't cover every page (each page costs 1 credit) —
 		// otherwise some pages get charged and the rest fail mid-batch.
-		if wallet, werr := f.s.WalletForUser(genCtx, userID); werr == nil && wallet.Balance < len(items) {
+		wallet, werr := f.s.WalletForUser(genCtx, userID)
+		if werr != nil {
+			f.batches.finish(batch.ID, "failed", "could not verify your credit balance")
+			return
+		}
+		if wallet.Balance < len(items) {
 			f.batches.finish(batch.ID, "failed", fmt.Sprintf("Not enough credits: this generation needs %d, you have %d.", len(items), wallet.Balance))
 			return
 		}

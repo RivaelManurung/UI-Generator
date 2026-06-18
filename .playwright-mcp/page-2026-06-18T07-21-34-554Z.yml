@@ -1,0 +1,171 @@
+- generic:
+  - main:
+    - status
+    - generic:
+      - generic:
+        - link:
+          - /url: /app/projects
+          - img
+          - text: My Projects
+        - generic:
+          - generic:
+            - img
+          - generic:
+            - paragraph: Dashboard Studio|
+            - button:
+              - generic: Untitled project
+              - img
+      - generic:
+        - generic:
+          - img
+          - text: 0 Credits
+        - button:
+          - img
+          - text: Top Up
+    - generic:
+      - complementary:
+        - generic:
+          - generic:
+            - paragraph: Studio Engine
+            - paragraph: Describe your layout requirements
+          - button:
+            - img
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - paragraph: Describe what kind of product you need. I will generate a coherent set of pages — dashboard, list, detail, and form — that you can preview from the tabs.
+                - generic:
+                  - paragraph: Recommended Preset Examples
+                  - generic:
+                    - button:
+                      - generic:
+                        - generic:
+                          - img
+                        - generic:
+                          - paragraph: Dashboard Overview
+                          - paragraph: Stats cards, charts, and transactions
+                    - button:
+                      - generic:
+                        - generic:
+                          - img
+                        - generic:
+                          - paragraph: User Management
+                          - paragraph: Data table with search and actions
+                    - button:
+                      - generic:
+                        - generic:
+                          - img
+                        - generic:
+                          - paragraph: Product Inventory
+                          - paragraph: Grid view with filters and modals
+                    - button:
+                      - generic:
+                        - generic:
+                          - img
+                        - generic:
+                          - paragraph: Order Management
+                          - paragraph: Orders table with status details
+                    - button:
+                      - generic:
+                        - generic:
+                          - img
+                        - generic:
+                          - paragraph: Analytics Dashboard
+                          - paragraph: Charts, date picker, and reports
+        - generic:
+          - generic: Dashboard Generation Prompt Description Input
+          - textbox:
+            - /placeholder: Describe what kind of webpage layout you want to generate. Minimum 40 characters...
+          - generic:
+            - generic: Min 40 characters required
+            - generic: 0/40
+          - button:
+            - generic: "Theme: shadcn/ui"
+            - generic: 1 credit / page
+          - generic:
+            - generic: "Pages: Auto"
+            - group:
+              - button [pressed]: Auto
+              - button: "1"
+              - button: "2"
+              - button: "3"
+              - button: "4"
+          - button [disabled]: Generate
+      - generic:
+        - generic:
+          - generic:
+            - button:
+              - img
+              - generic: Desktop L
+              - generic: "1440"
+            - button:
+              - img
+              - generic: Desktop
+              - generic: "1280"
+            - button:
+              - img
+              - generic: Tablet
+              - generic: "768"
+            - button:
+              - img
+              - generic: Mobile
+              - generic: "390"
+          - generic:
+            - button [disabled]:
+              - img
+              - text: Refine
+            - button [disabled]:
+              - img
+              - text: Code
+              - img
+            - button [disabled]:
+              - img
+              - text: History
+            - button:
+              - img
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - img
+              - heading [level=2]: Your Studio Canvas is Ready
+              - paragraph: Enter a detailed prompt in the left sidebar to generate a responsive admin dashboard or template page.
+              - generic:
+                - heading [level=3]:
+                  - img
+                  - text: Quick onboarding checklist
+                - list:
+                  - listitem:
+                    - generic: "1."
+                    - generic: Select a preset prompt example or write a custom description (minimum 40 characters).
+                  - listitem:
+                    - generic: "2."
+                    - generic:
+                      - text: "Choose a theme (currently:"
+                      - strong: shadcn/ui
+                      - text: ). Generation costs 1 credit per page.
+                  - listitem:
+                    - generic: "3."
+                    - generic: Confirm generation to run compile engines.
+                - button: Load an Example
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e6] [cursor=pointer]:
+    - img [ref=e7]
+  - alert
+  - dialog "Open the Studio" [ref=e11]:
+    - generic [ref=e12]:
+      - heading "Open the Studio" [level=2] [ref=e13]
+      - paragraph [ref=e14]: Create a new project or continue one you've already started.
+    - button "Create new project Start a fresh dashboard and generate from a prompt." [active] [ref=e16]:
+      - img [ref=e18]
+      - generic [ref=e19]:
+        - generic [ref=e20]: Create new project
+        - generic [ref=e21]: Start a fresh dashboard and generate from a prompt.
+    - generic [ref=e23]: No projects yet — create your first one above.
+    - button "Start blank" [ref=e25]
+    - button "Close" [ref=e26]:
+      - img
+      - generic [ref=e27]: Close

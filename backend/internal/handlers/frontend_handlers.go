@@ -231,6 +231,23 @@ func (h *Handler) FEProjectPages(c *gin.Context) {
 	c.JSON(http.StatusOK, pages)
 }
 
+// FESetProjectTheme switches the project's design system and re-renders all pages'
+// code in place — no regeneration, no AI, no credit.
+func (h *Handler) FESetProjectTheme(c *gin.Context) {
+	var input struct {
+		ThemeSlug string `json:"themeSlug"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		writeError(c, apperrors.BadRequest("invalid JSON body"))
+		return
+	}
+	if err := h.frontend.SetProjectTheme(c.Request.Context(), mustUser(c).ID, c.Param("id"), input.ThemeSlug); err != nil {
+		writeServiceError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true, "themeSlug": input.ThemeSlug})
+}
+
 // FEProjectExportZip streams a .zip of all generated files for the project.
 func (h *Handler) FEProjectExportZip(c *gin.Context) {
 	data, filename, err := h.frontend.ExportProjectZip(c.Request.Context(), mustUser(c).ID, c.Param("id"))
@@ -282,22 +299,6 @@ func (h *Handler) FEPreviewCost(c *gin.Context) {
 	}
 	_ = c.ShouldBindJSON(&body)
 	c.JSON(http.StatusOK, gin.H{"cost": h.frontend.PreviewCost(body.ThemeSlug)})
-}
-
-func (h *Handler) FEPurchaseCredits(c *gin.Context) {
-	var body struct {
-		Amount int `json:"amount"`
-	}
-	if err := c.ShouldBindJSON(&body); err != nil {
-		writeError(c, apperrors.BadRequest("invalid JSON body"))
-		return
-	}
-	balance, err := h.frontend.PurchaseCredits(c.Request.Context(), mustUser(c).ID, body.Amount)
-	if err != nil {
-		writeServiceError(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, balance)
 }
 
 func (h *Handler) FEDeductCredits(c *gin.Context) {

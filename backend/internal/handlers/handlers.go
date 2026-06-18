@@ -19,12 +19,14 @@ func isValidUUID(uuid string) bool {
 }
 
 type Handler struct {
-	studio   *services.StudioService
-	frontend *services.FrontendService
+	studio        *services.StudioService
+	frontend      *services.FrontendService
+	payments      *services.PaymentService
+	freeTemplates *services.FreeTemplateService
 }
 
-func New(studio *services.StudioService, frontend *services.FrontendService) *Handler {
-	return &Handler{studio: studio, frontend: frontend}
+func New(studio *services.StudioService, frontend *services.FrontendService, payments *services.PaymentService, freeTemplates *services.FreeTemplateService) *Handler {
+	return &Handler{studio: studio, frontend: frontend, payments: payments, freeTemplates: freeTemplates}
 }
 
 // Health reports that the service is up. Consumed by the frontend home page.

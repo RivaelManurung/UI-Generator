@@ -24,16 +24,6 @@ export function useCreditBalance() {
     fetchBalance();
   }, [fetchBalance]);
 
-  const purchaseCredits = useCallback(async (amount: number) => {
-    try {
-      const updated = await creditService.purchaseCredits(amount);
-      setBalance({ ...updated });
-      return updated;
-    } catch (err: any) {
-      throw new Error(err?.message ?? "Purchase failed");
-    }
-  }, []);
-
   const deductCredits = useCallback(async (amount: number, description: string) => {
     try {
       const success = await creditService.deductCredits(amount, description);
@@ -52,7 +42,6 @@ export function useCreditBalance() {
     loading,
     error,
     refresh: fetchBalance,
-    purchaseCredits,
     deductCredits,
   };
 }

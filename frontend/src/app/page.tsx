@@ -374,11 +374,11 @@ function MetricCard({
         variant === "venus" && "bg-venus text-galaxy",
       )}
     >
-      <p className={cn("text-xs font-semibold", variant === "primary" ? "text-white/70" : "landing-text-muted")}>
+      <p className={cn("text-xs font-semibold", variant === "primary" ? "text-white/90" : "landing-text-muted")}>
         {label}
       </p>
       <p className="mt-3 text-xl font-bold tabular-nums tracking-normal">{value}</p>
-      <p className={cn("mt-1 text-xs", variant === "primary" ? "text-white/70" : "landing-text-muted")}>
+      <p className={cn("mt-1 text-xs", variant === "primary" ? "text-white/90" : "landing-text-muted")}>
         {meta}
       </p>
     </div>
@@ -677,7 +677,7 @@ function PricingSection() {
 
               <div className="mt-4 flex items-baseline gap-1">
                 <span className="text-3xl font-bold tabular-nums tracking-normal">{plan.price}</span>
-                <span className={cn("text-sm", plan.highlighted ? "text-white/70" : "landing-text-muted")}>
+                <span className={cn("text-sm", plan.highlighted ? "text-white/90" : "landing-text-muted")}>
                   / month
                 </span>
               </div>
@@ -685,7 +685,7 @@ function PricingSection() {
               <p
                 className={cn(
                   "mt-3 min-h-10 text-sm leading-6",
-                  plan.highlighted ? "text-white/75" : "landing-text-soft",
+                  plan.highlighted ? "text-white/90" : "landing-text-soft",
                 )}
               >
                 {plan.description}
@@ -729,7 +729,7 @@ function FinalCta() {
   return (
     <section className="px-4 pb-24 pt-4 sm:px-6">
       <div className="landing-cta mx-auto max-w-7xl rounded-3xl p-8 text-center text-white sm:p-14">
-        <p className="text-xs font-semibold uppercase tracking-normal text-white/70">
+        <p className="text-xs font-semibold uppercase tracking-normal text-white/90">
           Generate your next project
         </p>
 
@@ -737,7 +737,7 @@ function FinalCta() {
           Stop designing every project from zero.
         </h2>
 
-        <p className="mx-auto mt-5 max-w-2xl leading-7 text-white/75">
+        <p className="mx-auto mt-5 max-w-2xl leading-7 text-white/90">
           Create a clean UI direction, preview project templates, and ship dashboard
           interfaces faster — without making your product look generic.
         </p>

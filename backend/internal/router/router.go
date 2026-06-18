@@ -40,7 +40,9 @@ func NewWithConfig(cfg config.Config) *gin.Engine {
 	}
 	studio := services.NewStudioServiceWithConfig(cfg)
 	frontend := services.NewFrontendService(studio)
-	h := handlers.New(studio, frontend)
+	payments := services.NewPaymentService(studio, cfg)
+	freeTemplates := services.NewFreeTemplateService(studio)
+	h := handlers.New(studio, frontend, payments, freeTemplates)
 	authLimiter := middleware.NewRateLimiter(redisClient, 20, time.Minute)
 	generationLimiter := middleware.NewRateLimiter(redisClient, 12, time.Minute)
 
@@ -111,6 +113,13 @@ func registerV1(v1 *gin.RouterGroup, h *handlers.Handler, verifier middleware.To
 	v1.GET("/themes", h.Themes)
 	v1.GET("/design-systems", h.DesignSystems)
 	v1.GET("/templates", h.Templates)
+	v1.GET("/credit-packages", h.ListCreditPackages)
+	// Public webhook — secured by Midtrans signature verification, not auth.
+	v1.POST("/payments/midtrans/notification", h.MidtransNotification)
+	// Public free templates (freebies).
+	v1.GET("/free-templates", h.ListFreeTemplates)
+	v1.GET("/free-templates/:slug", h.GetFreeTemplate)
+	v1.POST("/free-templates/:slug/download", h.DownloadFreeTemplate)
 
 	authenticated := v1.Group("", middleware.Auth(verifier))
 	{
@@ -154,8 +163,11 @@ func registerV1(v1 *gin.RouterGroup, h *handlers.Handler, verifier middleware.To
 		authenticated.GET("/credits/balance", h.FECreditBalance)
 		authenticated.GET("/credits/transactions", h.FECreditTransactions)
 		authenticated.POST("/credits/preview-cost", h.FEPreviewCost)
-		authenticated.POST("/credits/purchase", h.FEPurchaseCredits)
-		authenticated.POST("/credits/deduct", h.FEDeductCredits)
+		authenticated.POST("/credits/deduct", generationLimiter.Middleware("deduct"), h.FEDeductCredits)
+
+		// Paid credit top-up via Midtrans (replaces the old free /credits/purchase).
+		authenticated.POST("/payments/checkout", h.Checkout)
+		authenticated.GET("/payments/:orderId", h.PaymentStatus)
 		authenticated.GET("/billing/wallet", h.Wallet)
 		authenticated.GET("/billing/transactions", h.BillingTransactions)
 
@@ -183,6 +195,10 @@ func registerV1(v1 *gin.RouterGroup, h *handlers.Handler, verifier middleware.To
 		admin.POST("/templates", h.FEAdminCreateTemplate)
 		admin.PUT("/templates/:id", h.FEAdminUpdateTemplate)
 		admin.DELETE("/templates/:id", h.FEAdminDeleteTemplate)
+		admin.GET("/free-templates", h.FEAdminListFreeTemplates)
+		admin.POST("/free-templates", h.FEAdminPublishFreeTemplate)
+		admin.PATCH("/free-templates/:id", validateUUIDParams("id"), h.FEAdminUpdateFreeTemplate)
+		admin.DELETE("/free-templates/:id", validateUUIDParams("id"), h.FEAdminDeleteFreeTemplate)
 		admin.GET("/themes", h.FEAdminListThemes)
 		admin.POST("/themes", h.FEAdminCreateTheme)
 		admin.PUT("/themes/:slug", h.FEAdminUpdateTheme)

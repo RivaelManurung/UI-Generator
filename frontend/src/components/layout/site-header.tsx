@@ -30,7 +30,7 @@ export function SiteHeader() {
             D
           </span>
           <span className="leading-none">
-            <span className="block text-sm font-semibold tracking-tight">DashboardCraft</span>
+            <span className="block text-sm font-semibold tracking-normal">DashboardCraft</span>
             <span className="landing-text-muted mt-1 block text-[10px] font-semibold uppercase tracking-[0.22em]">
               Project UI Generator
             </span>

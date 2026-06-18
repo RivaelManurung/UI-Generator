@@ -325,7 +325,7 @@ export function ScreensCanvas({ screens, activeKey, onSelect, onRefine }: Screen
                               e.stopPropagation();
                               setDeviceByKey((m) => ({ ...m, [screen.key]: dk }));
                             }}
-                            className={`grid h-5 w-5 place-items-center rounded ${
+                            className={`grid h-6 w-6 place-items-center rounded ${
                               dev === dk ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
                             }`}
                           >
@@ -356,7 +356,7 @@ export function ScreensCanvas({ screens, activeKey, onSelect, onRefine }: Screen
                         e.stopPropagation();
                         onRefine(screen.key);
                       }}
-                      className="grid h-6 w-6 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                      className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
                     >
                       <Wrench className="h-3.5 w-3.5" />
                     </button>

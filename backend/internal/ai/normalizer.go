@@ -40,7 +40,6 @@ func NormalizeIntent(prompt string, fallbackPageType string, fallbackDomain stri
 	return intent
 }
 
-
 func ValidateGeneratedSchema(page schema.PageSchema) error {
 	// 1. Basic schema validation
 	if err := schema.Validate(page); err != nil {
@@ -82,9 +81,17 @@ func ValidateGeneratedSchema(page schema.PageSchema) error {
 		return nil
 	}
 
-	// Traverse page title
+	// Traverse page title + nav/brand
 	if err := checkValue(page.Title); err != nil {
 		return err
+	}
+	if err := checkValue(page.Brand); err != nil {
+		return err
+	}
+	for _, n := range page.Nav {
+		if err := checkValue(n); err != nil {
+			return err
+		}
 	}
 
 	// Traverse sections

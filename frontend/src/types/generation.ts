@@ -41,6 +41,8 @@ export interface MetricItem {
   trend?: string;
   icon?: string;
   image?: string;
+  /** Optional mini trend series for a real sparkline on the stat card. */
+  spark?: number[];
 }
 
 export interface SchemaField {
@@ -64,6 +66,12 @@ export interface SchemaSection {
   items?: MetricItem[];
   chartType?: string;
   datasetPreset?: string;
+  /** Real chart data: a single series, multiple series, or named series. */
+  series?: number[][] | { name?: string; data?: number[] }[] | number[];
+  /** Single-series chart data (convenience alias for one `series`). */
+  data?: number[];
+  /** X-axis category labels for charts. */
+  categories?: string[];
   columns?: string[];
   rows?: string[][];
   actions?: string[];
@@ -83,6 +91,10 @@ export interface PageSchema {
   layout: string;
   theme: string;
   title: string;
+  /** Product/app name shown in the nav (prompt-driven). */
+  brand?: string;
+  /** Product-specific primary menu, generated from the prompt (not canned). */
+  nav?: string[];
   sections: SchemaSection[];
 }
 

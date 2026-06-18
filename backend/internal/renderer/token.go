@@ -2,6 +2,7 @@ package renderer
 
 import (
 	"fmt"
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
@@ -9,6 +10,43 @@ import (
 	"github.com/kreasinusantara/ui-generator-backend/internal/designsystem"
 	"github.com/kreasinusantara/ui-generator-backend/internal/schema"
 )
+
+// chartSeries extracts the first numeric series for a chart from the schema —
+// real data when present (series/data), else inferred from numeric stat values,
+// else a deterministic-but-varied seeded series (never a flat canned wave).
+func chartSeries(section schema.Section) []float64 {
+	if len(section.Series) > 0 && len(section.Series[0]) > 0 {
+		return section.Series[0]
+	}
+	if len(section.Data) > 0 {
+		return section.Data
+	}
+	vals := []float64{}
+	for _, it := range section.Items {
+		if f, err := strconv.ParseFloat(strings.TrimSpace(strings.ReplaceAll(strings.Map(keepNumeric, it.Value), ",", "")), 64); err == nil {
+			vals = append(vals, f)
+		}
+	}
+	if len(vals) >= 2 {
+		return vals
+	}
+	h := 0
+	for _, c := range section.Title {
+		h = (h*31 + int(c)) % 997
+	}
+	out := make([]float64, 9)
+	for i := range out {
+		out[i] = math.Round(60 + float64(i)*1.4 + math.Sin(float64(i+1+h%9))*18 + float64(h%24))
+	}
+	return out
+}
+
+func keepNumeric(r rune) rune {
+	if (r >= '0' && r <= '9') || r == '.' || r == '-' || r == ',' {
+		return r
+	}
+	return -1
+}
 
 var slugRe = regexp.MustCompile(`[^a-z0-9]+`)
 
@@ -120,9 +158,20 @@ func renderTokenSection(section schema.Section) string {
 	case "chartPanel":
 		var s strings.Builder
 		s.WriteString(fmt.Sprintf("            <h2 className=\"ui-title\">%s</h2>\n", escape(section.Title)))
+		vals := chartSeries(section)
+		maxV := 1.0
+		for _, v := range vals {
+			if v > maxV {
+				maxV = v
+			}
+		}
 		s.WriteString("            <div className=\"ui-chart\">\n")
-		for _, h := range []int{42, 64, 50, 78, 60, 92, 72, 100, 84} {
-			s.WriteString(fmt.Sprintf("              <span className=\"ui-bar\" style={{ height: \"%d%%\" }} />\n", h))
+		for _, v := range vals {
+			h := int(math.Round(v / maxV * 100))
+			if h < 4 {
+				h = 4
+			}
+			s.WriteString(fmt.Sprintf("              <span className=\"ui-bar\" style={{ height: \"%d%%\" }} title=\"%s\" />\n", h, escape(strconv.FormatFloat(v, 'f', -1, 64))))
 		}
 		s.WriteString("            </div>\n")
 		card(s.String())
@@ -374,6 +423,27 @@ func renderTokenSection(section schema.Section) string {
 				s.WriteString(fmt.Sprintf("              <div className=\"ui-cal-cell\"><span className=\"ui-cal-day\">%d</span></div>\n", day))
 			}
 		}
+		s.WriteString("            </div>\n")
+		card(s.String())
+	case "authForm":
+		var s strings.Builder
+		s.WriteString("            <div style={{ maxWidth: 400, margin: \"0 auto\" }}>\n")
+		s.WriteString(fmt.Sprintf("              <h2 className=\"ui-title\" style={{ textAlign: \"center\" }}>%s</h2>\n", escape(fallbackStr(section.Title, "Welcome back"))))
+		if section.Subtitle != "" {
+			s.WriteString(fmt.Sprintf("              <p className=\"ui-muted\" style={{ textAlign: \"center\" }}>%s</p>\n", escape(section.Subtitle)))
+		}
+		fields := section.Fields
+		if len(fields) == 0 {
+			fields = []schema.Field{{Label: "Email", Type: "email"}, {Label: "Password", Type: "password"}}
+		}
+		for _, field := range fields {
+			s.WriteString("              <label className=\"ui-field\">\n")
+			s.WriteString(fmt.Sprintf("                <span>%s</span>\n", escape(field.Label)))
+			s.WriteString(fmt.Sprintf("                <input className=\"ui-input\" type=\"%s\" />\n", escape(fallbackStr(field.Type, "text"))))
+			s.WriteString("              </label>\n")
+		}
+		s.WriteString(fmt.Sprintf("              <button className=\"ui-btn\" style={{ width: \"100%%\", marginTop: 12 }}>%s</button>\n", escape(fallbackStr(section.PrimaryAction, "Sign in"))))
+		s.WriteString("              <button className=\"ui-btn\" style={{ width: \"100%%\", marginTop: 8, background: \"transparent\", color: \"var(--fg)\", border: \"1px solid var(--border)\" }}>Continue with Google</button>\n")
 		s.WriteString("            </div>\n")
 		card(s.String())
 	default:

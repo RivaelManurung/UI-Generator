@@ -1,0 +1,264 @@
+- generic [active] [ref=e1]:
+  - main [ref=e15]:
+    - status [ref=e16]
+    - generic [ref=e17]:
+      - generic [ref=e18]:
+        - link "My Projects" [ref=e19] [cursor=pointer]:
+          - /url: /app/projects
+          - img [ref=e20]
+          - text: My Projects
+        - generic [ref=e23]:
+          - img [ref=e25]
+          - generic [ref=e30]:
+            - paragraph [ref=e31]: Dashboard Studio|
+            - button "Switch or open a project" [ref=e32]:
+              - generic [ref=e33]: login
+              - img [ref=e34]
+      - generic [ref=e37]:
+        - generic [ref=e38]:
+          - img
+          - text: 1211 Credits
+        - button "Top up credit balance" [ref=e39]:
+          - img
+          - text: Top Up
+    - generic [ref=e40]:
+      - complementary [ref=e41]:
+        - generic [ref=e42]:
+          - generic [ref=e43]:
+            - paragraph [ref=e44]: Studio Engine
+            - paragraph [ref=e45]: Describe your layout requirements
+          - button "Collapse sidebar" [ref=e46]:
+            - img
+        - generic [ref=e50]:
+          - paragraph [ref=e53]: Describe what kind of product you need. I will generate a coherent set of pages — dashboard, list, detail, and form — that you can preview from the tabs.
+          - generic [ref=e54]:
+            - paragraph [ref=e55]: Recommended Preset Examples
+            - generic [ref=e56]:
+              - button "Load example prompt for Dashboard Overview" [ref=e57]:
+                - generic [ref=e58]:
+                  - img [ref=e60]
+                  - generic [ref=e62]:
+                    - paragraph [ref=e63]: Dashboard Overview
+                    - paragraph [ref=e64]: Stats cards, charts, and transactions
+              - button "Load example prompt for User Management" [ref=e65]:
+                - generic [ref=e66]:
+                  - img [ref=e68]
+                  - generic [ref=e73]:
+                    - paragraph [ref=e74]: User Management
+                    - paragraph [ref=e75]: Data table with search and actions
+              - button "Load example prompt for Product Inventory" [ref=e76]:
+                - generic [ref=e77]:
+                  - img [ref=e79]
+                  - generic [ref=e83]:
+                    - paragraph [ref=e84]: Product Inventory
+                    - paragraph [ref=e85]: Grid view with filters and modals
+              - button "Load example prompt for Order Management" [ref=e86]:
+                - generic [ref=e87]:
+                  - img [ref=e89]
+                  - generic [ref=e92]:
+                    - paragraph [ref=e93]: Order Management
+                    - paragraph [ref=e94]: Orders table with status details
+              - button "Load example prompt for Analytics Dashboard" [ref=e95]:
+                - generic [ref=e96]:
+                  - img [ref=e98]
+                  - generic [ref=e103]:
+                    - paragraph [ref=e104]: Analytics Dashboard
+                    - paragraph [ref=e105]: Charts, date picker, and reports
+        - generic [ref=e106]:
+          - generic [ref=e107]: Dashboard Generation Prompt Description Input
+          - textbox "Dashboard Generation Prompt Description Input" [ref=e108]:
+            - /placeholder: Describe what kind of webpage layout you want to generate. Minimum 40 characters...
+            - text: Create a finance analytics dashboard for a fintech company with revenue KPIs, a monthly revenue trend line chart, an expense breakdown donut, and a recent transactions table.
+          - generic [ref=e109]:
+            - generic [ref=e110]: Good description length
+            - generic [ref=e111]: 174/40
+          - button "Open theme customization sheet" [ref=e112]:
+            - generic [ref=e113]: "Theme: shadcn/ui"
+            - generic [ref=e114]: 1 credit / page
+          - generic [ref=e115]:
+            - generic [ref=e116]: "Pages: Auto"
+            - group "Number of pages to generate" [ref=e117]:
+              - button "Let AI choose the number of pages automatically" [pressed] [ref=e118]: Auto
+              - button "Generate 1 page" [ref=e119]: "1"
+              - button "Generate 2 pages" [ref=e120]: "2"
+              - button "Generate 3 pages" [ref=e121]: "3"
+              - button "Generate 4 pages" [ref=e122]: "4"
+          - button "Submit generation prompt" [ref=e123]: Generate
+      - generic [ref=e124]:
+        - generic [ref=e125]:
+          - generic [ref=e126]:
+            - button "Switch preview resolution to Desktop L (1440px)" [ref=e127]:
+              - img [ref=e128]
+              - generic [ref=e130]: Desktop L
+              - generic [ref=e131]: "1440"
+            - button "Switch preview resolution to Desktop (1280px)" [ref=e132]:
+              - img [ref=e133]
+              - generic [ref=e135]: Desktop
+              - generic [ref=e136]: "1280"
+            - button "Switch preview resolution to Tablet (768px)" [ref=e137]:
+              - img [ref=e138]
+              - generic [ref=e140]: Tablet
+              - generic [ref=e141]: "768"
+            - button "Switch preview resolution to Mobile (390px)" [ref=e142]:
+              - img [ref=e143]
+              - generic [ref=e145]: Mobile
+              - generic [ref=e146]: "390"
+          - generic [ref=e147]:
+            - button "Open section refinement panel" [ref=e148]:
+              - img
+              - text: Refine
+            - button "Code and export actions" [ref=e149]:
+              - img
+              - text: Code
+              - img
+            - button "Open version history timeline" [disabled]:
+              - img
+              - text: History
+            - button "More studio actions" [ref=e150]:
+              - img
+        - generic [ref=e152]:
+          - generic [ref=e153]:
+            - generic [ref=e154]:
+              - button "Vaultstream Finance — Revenue Analytics" [ref=e245]:
+                - generic [ref=e246]: Vaultstream Finance — Revenue Analytics
+              - button "Sign in to CloudFlow" [pressed] [ref=e247]:
+                - generic [ref=e248]: Sign in to CloudFlow
+              - button "Finance Analytics — Lyra Capital" [ref=e249]:
+                - generic [ref=e250]: Finance Analytics — Lyra Capital
+            - generic [ref=e157]:
+              - group "Preview fit mode" [ref=e232]:
+                - button "Fit to width" [pressed] [ref=e233]: Width
+                - button "Fit whole page" [ref=e234]: Page
+              - generic "Quality score 96" [ref=e251]: Q96
+              - button "Refine Sign in to CloudFlow" [ref=e252]:
+                - img [ref=e237]
+              - button "Manage Sign in to CloudFlow" [ref=e253]:
+                - img [ref=e240]
+          - iframe [ref=e244]:
+            - main [ref=f33e2]:
+              - generic [ref=f33e3]:
+                - heading "Sign in to CloudFlow" [level=1] [ref=f33e4]
+                - paragraph [ref=f33e5]: Sign in to continue
+              - generic [ref=f33e6]:
+                - generic [ref=f33e9]:
+                  - heading "Welcome back to your workspace" [level=1] [ref=f33e10]
+                  - paragraph [ref=f33e11]: Sign in to access your dashboard, manage your projects, and collaborate with your team in real time.
+                  - generic [ref=f33e12]:
+                    - button "Get started free" [ref=f33e13] [cursor=pointer]
+                    - button "Watch 2-min demo" [ref=f33e14] [cursor=pointer]
+                    - button "Talk to sales" [ref=f33e15] [cursor=pointer]
+                - generic [ref=f33e18]:
+                  - heading "Sign in to your account" [level=2] [ref=f33e19]
+                  - generic [ref=f33e20]:
+                    - generic [ref=f33e21]:
+                      - generic [ref=f33e22]: Work email
+                      - textbox "Work email" [ref=f33e23]:
+                        - /placeholder: ""
+                    - generic [ref=f33e24]:
+                      - generic [ref=f33e25]: Password
+                      - textbox "Password" [ref=f33e26]:
+                        - /placeholder: ""
+                    - generic [ref=f33e27]:
+                      - generic [ref=f33e28]: Remember me for 30 days
+                      - checkbox "Remember me for 30 days" [ref=f33e29]
+                    - generic [ref=f33e30]:
+                      - generic [ref=f33e31]: Forgot password?
+                      - textbox "Forgot password?" [ref=f33e32]:
+                        - /placeholder: ""
+                  - button "Sign in" [ref=f33e33] [cursor=pointer]
+                - generic [ref=f33e35]:
+                  - button "Continue with GitHub" [ref=f33e36] [cursor=pointer]
+                  - button "Continue with Microsoft" [ref=f33e37] [cursor=pointer]
+                  - button "Create a new account" [ref=f33e38] [cursor=pointer]
+                  - button "Single sign-on (SSO)" [ref=f33e39] [cursor=pointer]
+                  - button "Continue with Google" [ref=f33e40] [cursor=pointer]
+                - generic [ref=f33e42]:
+                  - heading "Why teams choose CloudFlow" [level=2] [ref=f33e43]
+                  - generic [ref=f33e44]:
+                    - article [ref=f33e45]:
+                      - img [ref=f33e47]
+                      - strong [ref=f33e52]: Real-time collaboration
+                      - paragraph [ref=f33e53]: Edit documents, boards and dashboards together with your team in real time.
+                    - article [ref=f33e54]:
+                      - img [ref=f33e56]
+                      - strong [ref=f33e58]: Enterprise security
+                      - paragraph [ref=f33e59]: SOC 2 Type II, SSO and end-to-end encryption protect every byte of your data.
+                    - article [ref=f33e60]:
+                      - img [ref=f33e62]
+                      - strong [ref=f33e65]: 200+ integrations
+                      - paragraph [ref=f33e66]: Connect Slack, GitHub, Figma, Notion and more with native, no-code setup.
+                    - article [ref=f33e67]:
+                      - img [ref=f33e69]
+                      - strong [ref=f33e71]: Lightning fast
+                      - paragraph [ref=f33e72]: Built on a global edge network with sub-100ms response times worldwide.
+                    - article [ref=f33e73]:
+                      - img [ref=f33e75]
+                      - strong [ref=f33e78]: Smart automation
+                      - paragraph [ref=f33e79]: Automate repetitive workflows and reclaim hours of work every week.
+                    - article [ref=f33e80]:
+                      - img [ref=f33e82]
+                      - strong [ref=f33e83]: Advanced analytics
+                      - paragraph [ref=f33e84]: Track velocity, cycle time and team health from one beautiful dashboard.
+                - generic [ref=f33e86]:
+                  - heading "Loved by teams shipping faster" [level=2] [ref=f33e87]
+                  - generic [ref=f33e88]:
+                    - figure "Sarah Chen Head of Design, Linear" [ref=f33e89]:
+                      - blockquote [ref=f33e90]: CloudFlow completely changed how our design team collaborates. Real-time editing is a game changer.
+                      - generic [ref=f33e92]:
+                        - strong [ref=f33e93]: Sarah Chen
+                        - generic [ref=f33e94]: Head of Design, Linear
+                    - figure "Marcus Rivera CTO, Stripe" [ref=f33e95]:
+                      - blockquote [ref=f33e96]: We replaced three tools and saved $40k a year. The integrations just work out of the box.
+                      - generic [ref=f33e98]:
+                        - strong [ref=f33e99]: Marcus Rivera
+                        - generic [ref=f33e100]: CTO, Stripe
+                    - figure "Aisha Patel Product Lead, Vercel" [ref=f33e101]:
+                      - blockquote [ref=f33e102]: The cleanest interface we have ever used. Our team adopted it in a single afternoon.
+                      - generic [ref=f33e104]:
+                        - strong [ref=f33e105]: Aisha Patel
+                        - generic [ref=f33e106]: Product Lead, Vercel
+                    - figure "Tom Lindberg VP Engineering, Notion" [ref=f33e107]:
+                      - blockquote [ref=f33e108]: Enterprise-grade security without the enterprise complexity. Exactly what we needed.
+                      - generic [ref=f33e110]:
+                        - strong [ref=f33e111]: Tom Lindberg
+                        - generic [ref=f33e112]: VP Engineering, Notion
+                - generic [ref=f33e114]:
+                  - heading "Get up and running in 3 steps" [level=2] [ref=f33e115]
+                  - list [ref=f33e116]:
+                    - listitem [ref=f33e117]:
+                      - generic [ref=f33e118]: "1"
+                      - generic [ref=f33e119]:
+                        - strong [ref=f33e120]: Create your workspace
+                        - generic [ref=f33e121]: Sign up in under 60 seconds with just your email. No credit card required.
+                    - listitem [ref=f33e122]:
+                      - generic [ref=f33e123]: "2"
+                      - generic [ref=f33e124]:
+                        - strong [ref=f33e125]: Invite your team
+                        - generic [ref=f33e126]: Bring teammates on board with one click. Free for up to 10 collaborators.
+                    - listitem [ref=f33e127]:
+                      - generic [ref=f33e128]: "3"
+                      - generic [ref=f33e129]:
+                        - strong [ref=f33e130]: Connect your tools
+                        - generic [ref=f33e131]: Import projects from Jira, Trello or GitHub and start shipping on day one.
+                - generic [ref=f33e133]:
+                  - heading "Simple, transparent pricing" [level=2] [ref=f33e134]
+                  - generic [ref=f33e135]:
+                    - article [ref=f33e136]:
+                      - generic [ref=f33e137]: For individuals
+                      - heading "Starter" [level=3] [ref=f33e138]
+                      - generic [ref=f33e139]: Free forever
+                      - button "Start 14-day free trial" [ref=f33e140] [cursor=pointer]
+                    - article [ref=f33e141]:
+                      - generic [ref=f33e142]: Most popular
+                      - heading "Team" [level=3] [ref=f33e143]
+                      - generic [ref=f33e144]: $12 / user / mo
+                      - button "Start 14-day free trial" [ref=f33e145] [cursor=pointer]
+                    - article [ref=f33e146]:
+                      - generic [ref=f33e147]: For 50+ seats
+                      - heading "Enterprise" [level=3] [ref=f33e148]
+                      - generic [ref=f33e149]: Custom
+                      - button "Start 14-day free trial" [ref=f33e150] [cursor=pointer]
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e10] [cursor=pointer]:
+    - img [ref=e11]
+  - alert [ref=e14]

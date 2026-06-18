@@ -81,7 +81,6 @@ export function ThemePickerSheet({
           {systems.map((ds) => {
             const isActive = selectedThemeSlug === ds.slug;
             const isDisabled = ds.status === "soon";
-            const cost = ds.cost ?? 1;
 
             return (
               <button
@@ -102,9 +101,6 @@ export function ThemePickerSheet({
               >
                 <Thumbnail ds={ds} />
                 <p className="mt-2 text-xs font-bold">{ds.name}</p>
-                <p className="text-[10px] text-muted-foreground font-semibold mt-0.5">
-                  {cost} credit{cost > 1 ? "s" : ""}
-                </p>
 
                 {isActive && (
                   <Badge variant="secondary" className="absolute top-2 right-2 text-[8px] h-4 px-1 border-0">

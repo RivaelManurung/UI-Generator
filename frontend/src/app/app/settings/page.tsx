@@ -46,7 +46,6 @@ export default function SettingsPage() {
   const {
     balance,
     loading: balanceLoading,
-    purchaseCredits,
   } = useCreditBalance();
 
   const {
@@ -133,7 +132,6 @@ export default function SettingsPage() {
             <BillingSettings
               balance={balance}
               transactions={transactions}
-              onTopUp={purchaseCredits}
             />
           </TabsContent>
         </Tabs>

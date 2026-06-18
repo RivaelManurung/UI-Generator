@@ -7,14 +7,12 @@ interface EmptyPreviewProps {
   isGenerating: boolean;
   onSelectExample: () => void;
   selectedThemeName: string;
-  themeCost: number;
 }
 
 export function EmptyPreview({
   isGenerating,
   onSelectExample,
   selectedThemeName,
-  themeCost,
 }: EmptyPreviewProps) {
   return (
     <div className="grid h-[calc(100vh-8.5rem)] min-h-[620px] place-items-center rounded-xl border border-border bg-card text-card-foreground p-6">
@@ -49,7 +47,7 @@ export function EmptyPreview({
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-foreground font-bold">2.</span>
-                <span>Choose a theme (currently: <strong>{selectedThemeName}</strong>, cost: <strong>{themeCost} credits</strong>).</span>
+                <span>Choose a theme (currently: <strong>{selectedThemeName}</strong>). Generation costs 1 credit per page.</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-foreground font-bold">3.</span>

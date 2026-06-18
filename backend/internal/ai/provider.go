@@ -3,10 +3,115 @@ package ai
 import (
 	"context"
 	"fmt"
+	"math"
+	"strconv"
 	"strings"
 
 	"github.com/kreasinusantara/ui-generator-backend/internal/schema"
 )
+
+// dseed is a small deterministic hash so mock data varies by domain/label
+// instead of being byte-identical across every generated page.
+func dseed(s string) int {
+	h := 2166136261
+	for _, c := range strings.ToLower(s) {
+		h = (h ^ int(c)) * 16777619
+	}
+	if h < 0 {
+		h = -h
+	}
+	return h % 1000000
+}
+
+func groupThousands(n int) string {
+	s := strconv.Itoa(n)
+	if len(s) <= 3 {
+		return s
+	}
+	var b strings.Builder
+	pre := len(s) % 3
+	if pre > 0 {
+		b.WriteString(s[:pre])
+	}
+	for i := pre; i < len(s); i += 3 {
+		if b.Len() > 0 {
+			b.WriteByte(',')
+		}
+		b.WriteString(s[i : i+3])
+	}
+	return b.String()
+}
+
+func mockSpark(seed string, up bool) []float64 {
+	h := dseed(seed)
+	out := make([]float64, 10)
+	for i := 0; i < 10; i++ {
+		drift := float64(i) * 1.3
+		if !up {
+			drift = -float64(i) * 1.0
+		}
+		v := math.Round(50 + drift + math.Sin(float64(i+1+h%7))*8)
+		if v < 4 {
+			v = 4
+		}
+		out[i] = v
+	}
+	return out
+}
+
+// mockStats produces four domain-varied KPI cards (different numbers per domain)
+// with real sparkline data, replacing the old byte-identical hardcoded metrics.
+func mockStats(labels labelSet, domainName string) []schema.MetricItem {
+	icons := []string{"activity", "calendar", "users", "wallet"}
+	names := []string{labels.MetricA, labels.MetricB, labels.MetricC, labels.MetricD}
+	out := make([]schema.MetricItem, 4)
+	for i, name := range names {
+		s := dseed(name + domainName)
+		up := s%5 != 0
+		var val string
+		switch i {
+		case 3:
+			val = "$" + groupThousands((80+s%9000)*7)
+		case 2:
+			val = strconv.Itoa(12 + s%240)
+		default:
+			val = groupThousands(120 + s%9000)
+		}
+		trend := "+" + strconv.Itoa(2+s%18) + "%"
+		if !up {
+			trend = "-" + strconv.Itoa(1+s%9) + "%"
+		}
+		out[i] = schema.MetricItem{Label: name, Value: val, Trend: trend, Icon: icons[i], Spark: mockSpark(name+domainName, up)}
+	}
+	return out
+}
+
+// mockChart attaches real, domain-varied series + month categories so the chart
+// renders actual data instead of a canned wave.
+func mockChart(title, chartType, domainName, span string) schema.Section {
+	h := dseed(title + domainName)
+	cats := []string{"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep"}
+	n := len(cats)
+	series := make([]float64, n)
+	for i := 0; i < n; i++ {
+		v := math.Round(60 + float64(i)*1.4 + math.Sin(float64(i+1+h%9))*18 + float64(h%24))
+		if v < 6 {
+			v = 6
+		}
+		series[i] = v
+	}
+	return schema.Section{Type: "chartPanel", Span: span, Title: title, ChartType: chartType, DatasetPreset: domainName + "-trend", Series: [][]float64{series}, Categories: cats}
+}
+
+// mockDonut builds a domain-varied composition (donut) chart.
+func mockDonut(domainName, span string) schema.Section {
+	labels := []string{"Direct", "Referral", "Organic", "Paid"}
+	segs := make([]float64, len(labels))
+	for i, l := range labels {
+		segs[i] = float64(12 + dseed(l+domainName)%40)
+	}
+	return schema.Section{Type: "chartPanel", Span: span, Title: "Share by Segment", ChartType: "donut", Categories: labels, Series: [][]float64{segs}}
+}
 
 type GenerateRequest struct {
 	Prompt    string
@@ -137,6 +242,8 @@ func buildSchema(prompt, pageType, domainName, theme string) schema.PageSchema {
 		Layout:   "admin-sidebar",
 		Theme:    theme,
 		Title:    labels.Title,
+		Brand:    labels.Title,
+		Nav:      labels.Nav,
 	}
 
 	switch pageType {
@@ -147,9 +254,10 @@ func buildSchema(prompt, pageType, domainName, theme string) schema.PageSchema {
 		}
 	case "analytics":
 		base.Sections = []schema.Section{
-			{Type: "statsGrid", Items: []schema.MetricItem{{Label: labels.MetricA, Value: "12,430", Trend: "+12%", Icon: "activity"}, {Label: labels.MetricB, Value: "328", Trend: "+8%", Icon: "calendar"}, {Label: labels.MetricC, Value: "86", Trend: "+4%", Icon: "users"}, {Label: labels.MetricD, Value: "$128.4k", Trend: "+18%", Icon: "wallet"}}},
+			{Type: "statsGrid", Items: mockStats(labels, domainName)},
 			{Type: "filterToolbar", SearchPlaceholder: "Filter analytics", Filters: []string{"Segment", "Date range", "Owner"}, PrimaryAction: "Export"},
-			{Type: "chartPanel", Title: labels.ChartTitle, ChartType: "bar", DatasetPreset: domainName + "-analytics"},
+			mockChart(labels.ChartTitle, "line", domainName, "two-thirds"),
+			mockDonut(domainName, "third"),
 			tableSection(labels),
 		}
 	case "form":
@@ -158,10 +266,9 @@ func buildSchema(prompt, pageType, domainName, theme string) schema.PageSchema {
 			{Type: "actionFooter", PrimaryAction: "Save", Actions: []string{"Save draft", "Cancel"}},
 		}
 	case "login":
+		base.Title = "Welcome back"
 		base.Sections = []schema.Section{
-			{Type: "formSection", Title: "Sign in to " + labels.Title, Fields: []schema.Field{{Label: "Email", Type: "email"}, {Label: "Password", Type: "password"}}, SubmitLabel: "Sign in"},
-			{Type: "emptyState", Title: "Secure workspace access"},
-			{Type: "actionFooter", PrimaryAction: "Sign in", Actions: []string{"Forgot password"}},
+			{Type: "authForm", Title: "Welcome back", Subtitle: "Sign in to " + labels.Title, Fields: []schema.Field{{Label: "Email", Type: "email", Hint: "you@company.com"}, {Label: "Password", Type: "password", Hint: "••••••••"}}, PrimaryAction: "Sign in", Actions: []string{"Forgot password?", "Don't have an account? Sign up"}},
 		}
 	case "detail":
 		base.Sections = []schema.Section{
@@ -170,12 +277,12 @@ func buildSchema(prompt, pageType, domainName, theme string) schema.PageSchema {
 		}
 	default:
 		base.PageType = "dashboard"
-		chart := schema.Section{Type: "chartPanel", Span: "two-thirds", Title: labels.ChartTitle, ChartType: "bar", DatasetPreset: domainName + "-growth"}
+		chart := mockChart(labels.ChartTitle, "line", domainName, "two-thirds")
 		activity := schema.Section{Type: "activityTimeline", Span: "third", Title: "Recent Activity", Items: []schema.MetricItem{{Label: "New " + labels.Entity + " created", Value: "2 min ago", Trend: "ok"}, {Label: labels.Owner + " updated a record", Value: "18 min ago", Trend: "ok"}, {Label: "Weekly report generated", Value: "1 hr ago", Trend: "ok"}}}
 		table := tableSection(labels)
 		table.Span = "full"
 		base.Sections = []schema.Section{
-			{Type: "statsGrid", Span: "full", Items: []schema.MetricItem{{Label: labels.MetricA, Value: "12,430", Trend: "+12%", Icon: "activity"}, {Label: labels.MetricB, Value: "328", Trend: "+8%", Icon: "calendar"}, {Label: labels.MetricC, Value: "86", Trend: "+4%", Icon: "users"}, {Label: labels.MetricD, Value: "$128.4k", Trend: "+18%", Icon: "wallet"}}},
+			{Type: "statsGrid", Span: "full", Items: mockStats(labels, domainName)},
 			chart,
 			activity,
 			table,
@@ -233,20 +340,21 @@ type labelSet struct {
 	MetricD    string
 	ChartTitle string
 	Columns    []string
+	Nav        []string
 }
 
 func domainLabels(domainName string) labelSet {
 	switch strings.ToLower(domainName) {
 	case "hospital", "medical", "healthcare":
-		return labelSet{"Hospital Operations", "Patient", "Dr. Maya", "Total Patients", "Appointments Today", "Available Doctors", "Monthly Revenue", "Patient Visit Trend", []string{"Patient", "Doctor", "Department", "Time", "Status"}}
+		return labelSet{"Hospital Operations", "Patient", "Dr. Maya", "Total Patients", "Appointments Today", "Available Doctors", "Monthly Revenue", "Patient Visit Trend", []string{"Patient", "Doctor", "Department", "Time", "Status"}, []string{"Dashboard", "Patients", "Appointments", "Doctors", "Departments", "Billing"}}
 	case "school", "education":
-		return labelSet{"School Command Center", "Student", "Academic Office", "Active Students", "Classes Today", "Teachers Online", "Fee Collection", "Attendance Trend", []string{"Student", "Class", "Advisor", "Attendance", "Status"}}
+		return labelSet{"School Command Center", "Student", "Academic Office", "Active Students", "Classes Today", "Teachers Online", "Fee Collection", "Attendance Trend", []string{"Student", "Class", "Advisor", "Attendance", "Status"}, []string{"Dashboard", "Students", "Classes", "Teachers", "Grades", "Reports"}}
 	case "finance":
-		return labelSet{"Finance Performance", "Account", "Finance Lead", "Revenue", "Invoices Due", "Active Accounts", "Cash Flow", "Revenue Movement", []string{"Account", "Owner", "Amount", "Due Date", "Status"}}
+		return labelSet{"Finance Performance", "Account", "Finance Lead", "Revenue", "Invoices Due", "Active Accounts", "Cash Flow", "Revenue Movement", []string{"Account", "Owner", "Amount", "Due Date", "Status"}, []string{"Overview", "Transactions", "Invoices", "Accounts", "Budgets", "Reports"}}
 	case "inventory", "warehouse":
-		return labelSet{"Inventory Control", "Stock Item", "Warehouse Lead", "Total SKUs", "Low Stock", "Suppliers", "Stock Value", "Stock Movement", []string{"Item", "Category", "Warehouse", "Quantity", "Status"}}
+		return labelSet{"Inventory Control", "Stock Item", "Warehouse Lead", "Total SKUs", "Low Stock", "Suppliers", "Stock Value", "Stock Movement", []string{"Item", "Category", "Warehouse", "Quantity", "Status"}, []string{"Dashboard", "Products", "Orders", "Suppliers", "Warehouses", "Reports"}}
 	default:
-		return labelSet{"Operations Dashboard", "Record", "Workspace Owner", "Total Records", "Open Tasks", "Team Members", "Monthly Value", "Operational Trend", []string{"Name", "Owner", "Category", "Updated", "Status"}}
+		return labelSet{"Operations Dashboard", "Record", "Workspace Owner", "Total Records", "Open Tasks", "Team Members", "Monthly Value", "Operational Trend", []string{"Name", "Owner", "Category", "Updated", "Status"}, []string{"Dashboard", "Records", "Activity", "Reports", "Settings"}}
 	}
 }
 

@@ -95,32 +95,29 @@ function icon(name?: string, cls = "ic"): string {
   return `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
 }
 
-/* ----------------------------------------------------------------- images */
-// Deterministic placeholder media so generated UIs feel populated (real avatars +
-// photos), Stitch-style, without needing an image model. Both load fine inside the
-// sandboxed preview iframe (image loads aren't blocked by the sandbox).
-function seedOf(value: string): string {
-  return encodeURIComponent((value || "ui").trim().toLowerCase().replace(/\s+/g, "-").slice(0, 40) || "ui");
-}
-function avatarUrl(seed: string): string {
-  return `https://api.dicebear.com/7.x/initials/svg?seed=${seedOf(seed)}&backgroundType=gradientLinear&fontWeight=700`;
-}
+/* ----------------------------------------------------------------- visuals */
+// NO default/stock images — generated UIs use CSS initials avatars and branded
+// gradient "media" tiles (see avatarBox / abstractVisual below) so nothing ever
+// renders a random stock photo.
 function hashNum(value: string): number {
   let h = 0;
   for (let i = 0; i < value.length; i++) h = (h * 31 + value.charCodeAt(i)) % 100000;
   return h;
 }
-// photoFor resolves an image source: a real http(s) URL passed straight through
-// (e.g. produced by an image-gen provider), OR keyword(s) → a CONTENT-RELEVANT
-// stock photo (loremflickr), OR a stable random photo when no hint is given.
-function photoFor(hint: string | undefined, fallbackSeed: string, w: number, h: number): string {
-  const v = (hint ?? "").trim();
-  if (/^https?:\/\//i.test(v)) return v;
-  if (v) {
-    const tags = v.toLowerCase().replace(/[^a-z0-9\s,]/g, "").trim().replace(/[\s,]+/g, ",").slice(0, 60);
-    return `https://loremflickr.com/${w}/${h}/${tags}?lock=${hashNum(v)}`;
-  }
-  return `https://picsum.photos/seed/${seedOf(fallbackSeed)}/${w}/${h}`;
+
+// No default/stock images. Avatars are CSS initials; "media" (hero/gallery) is a
+// deterministic branded gradient + a content icon — intentional, never random.
+function initials(name: string): string {
+  const parts = (name || "U").trim().split(/\s+/).filter(Boolean).slice(0, 2);
+  const s = parts.map((p) => p[0]).join("").toUpperCase();
+  return esc(s || "U");
+}
+function avatarBox(name: string, cls: string): string {
+  return `<span class="${cls} av-initials" aria-hidden="true">${initials(name)}</span>`;
+}
+function abstractVisual(seed: string, iconName: string, cls: string): string {
+  const h = hashNum(seed || "media");
+  return `<div class="${cls} media-visual" style="--mv-h:${h % 360}deg"><span class="media-ico">${icon(iconName)}</span></div>`;
 }
 
 export interface PreviewNavItem {
@@ -160,141 +157,275 @@ const SUBTITLE: Record<string, string> = {
 };
 
 /* --------------------------------------------------------------- chart svg */
-/** Deterministic wave values (0..1) so previews are stable across renders. */
-function wave(count: number): number[] {
-  const n = Math.max(count, 2);
-  return Array.from({ length: n }, (_, i) => Math.sin((i + 1) * 1.3) * 0.5 + 0.5);
+// Charts are DATA-DRIVEN. They read real numbers from the schema (series/data),
+// else infer them from a numeric table column or stat values, and only fall back
+// to a deterministic-but-varied curve (seeded by the title) so two charts are
+// never the identical wave. Every chart has axes, value labels and a gradient.
+
+function parseNum(value: unknown): number {
+  const m = String(value ?? "").replace(/[, ]/g, "").match(/-?\d+(?:\.\d+)?/);
+  return m ? parseFloat(m[0]) : NaN;
 }
 
-function barChartSvg(): string {
-  const vals = wave(9);
-  const W = 600;
-  const H = 200;
-  const gap = 14;
-  const bw = (W - gap * (vals.length - 1)) / vals.length;
-  const bars = vals
+function fmtNum(n: number): string {
+  const a = Math.abs(n);
+  if (a >= 1e9) return (n / 1e9).toFixed(1).replace(/\.0$/, "") + "B";
+  if (a >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, "") + "M";
+  if (a >= 1e3) return (n / 1e3).toFixed(1).replace(/\.0$/, "") + "k";
+  return String(Math.round(n * 100) / 100);
+}
+
+// Deterministic-but-varied fallback curve seeded by a label.
+function seededCurve(seed: string, n: number): number[] {
+  const h = hashNum(seed || "chart");
+  const phase = (h % 17) / 2.2;
+  const drift = (((h >> 3) % 9) - 4) / (Math.max(n, 2) * 5);
+  const amp = 0.24 + (h % 5) * 0.045;
+  return Array.from({ length: Math.max(n, 2) }, (_, i) =>
+    Math.max(8, Math.round((0.5 + drift * i + Math.sin((i + 1 + phase) * 0.92) * amp) * 1000)),
+  );
+}
+
+interface ChartData {
+  series: number[][];
+  names: string[];
+  categories: string[];
+}
+
+function chartData(section: SchemaSection, fallbackPoints = 9): ChartData {
+  let series: number[][] = [];
+  let names: string[] = [];
+
+  const raw = section.series;
+  if (Array.isArray(raw) && raw.length) {
+    if (Array.isArray(raw[0])) {
+      series = (raw as number[][]).map((r) => r.map(parseNum).filter(Number.isFinite));
+    } else if (raw[0] && typeof raw[0] === "object") {
+      const objs = raw as { name?: string; data?: number[] }[];
+      series = objs.map((o) => (o.data ?? []).map(parseNum).filter(Number.isFinite));
+      names = objs.map((o) => o.name ?? "");
+    } else {
+      series = [(raw as number[]).map(parseNum).filter(Number.isFinite)];
+    }
+  } else if (Array.isArray(section.data) && section.data.length) {
+    series = [section.data.map(parseNum).filter(Number.isFinite)];
+  }
+  series = series.filter((s) => s.length);
+
+  // Infer from a numeric table column.
+  if (!series.length && section.rows?.length) {
+    const width = section.columns?.length ?? section.rows[0]?.length ?? 0;
+    for (let c = 0; c < width; c++) {
+      const nums = section.rows.map((r) => parseNum(r[c]));
+      if (nums.filter(Number.isFinite).length >= Math.min(3, section.rows.length)) {
+        series = [nums.map((n) => (Number.isFinite(n) ? n : 0))];
+        break;
+      }
+    }
+  }
+  // Infer from stat values.
+  if (!series.length && section.items?.length) {
+    const nums = section.items.map((it) => parseNum(it.value));
+    if (nums.filter(Number.isFinite).length >= 2) series = [nums.map((n) => (Number.isFinite(n) ? n : 0))];
+  }
+
+  let categories = section.categories ?? [];
+  if (!categories.length && section.items?.length && series[0] && section.items.length === series[0].length) {
+    categories = section.items.map((it) => it.label);
+  }
+
+  if (!series.length) series = [seededCurve(section.title ?? "chart", fallbackPoints)];
+  return { series, names, categories };
+}
+
+const CHART_COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)"];
+const CH_W = 640;
+const CH_H = 240;
+const CH = { l: 46, r: 16, t: 18, b: 30 };
+
+function xTicks(categories: string[], n: number, x: (i: number) => number): string {
+  if (!categories.length) return "";
+  const step = Math.max(1, Math.ceil(n / 6));
+  return categories
+    .slice(0, n)
+    .map((c, i) =>
+      i % step === 0
+        ? `<text x="${x(i).toFixed(1)}" y="${CH_H - 9}" class="ch-xtick" text-anchor="middle">${esc(String(c).slice(0, 7))}</text>`
+        : "",
+    )
+    .join("");
+}
+
+function yGrid(minV: number, maxV: number, y: (v: number) => number): string {
+  const ticks = 4;
+  const span = maxV - minV || 1;
+  return Array.from({ length: ticks + 1 }, (_, t) => {
+    const v = minV + (span * t) / ticks;
+    const gy = y(v).toFixed(1);
+    return `<line x1="${CH.l}" y1="${gy}" x2="${CH_W - CH.r}" y2="${gy}" class="ch-grid"/><text x="${CH.l - 8}" y="${gy}" class="ch-ytick" text-anchor="end" dominant-baseline="middle">${fmtNum(v)}</text>`;
+  }).join("");
+}
+
+// Catmull-Rom → cubic bezier so the line reads as a smooth, polished curve.
+function smoothLine(pts: readonly (readonly [number, number])[]): string {
+  if (pts.length < 2) return pts.length ? `M${pts[0][0]} ${pts[0][1]}` : "";
+  let d = `M${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`;
+  const t = 0.16;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i === 0 ? 0 : i - 1];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[i + 2 < pts.length ? i + 2 : i + 1];
+    const c1x = p1[0] + (p2[0] - p0[0]) * t;
+    const c1y = p1[1] + (p2[1] - p0[1]) * t;
+    const c2x = p2[0] - (p3[0] - p1[0]) * t;
+    const c2y = p2[1] - (p3[1] - p1[1]) * t;
+    d += ` C${c1x.toFixed(1)} ${c1y.toFixed(1)} ${c2x.toFixed(1)} ${c2y.toFixed(1)} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`;
+  }
+  return d;
+}
+
+function lineChartSvg(d: ChartData, area: boolean): string {
+  const iw = CH_W - CH.l - CH.r;
+  const ih = CH_H - CH.t - CH.b;
+  const all = d.series.flat();
+  const maxV = Math.max(1, ...all);
+  const minV = Math.min(0, ...all);
+  const span = maxV - minV || 1;
+  const n = Math.max(...d.series.map((s) => s.length), 2);
+  const x = (i: number) => CH.l + (i * iw) / (n - 1);
+  const y = (v: number) => CH.t + ih - ((v - minV) / span) * ih;
+  const grad = `<defs><linearGradient id="chFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--chart-1)" stop-opacity="0.26"/><stop offset="100%" stop-color="var(--chart-1)" stop-opacity="0"/></linearGradient></defs>`;
+  const single = d.series.length === 1;
+  const paths = d.series
+    .map((s, si) => {
+      const pts = s.map((v, i) => [x(i), y(v)] as const);
+      const line = smoothLine(pts);
+      const stroke = CHART_COLORS[si % CHART_COLORS.length];
+      const fill =
+        area && single
+          ? `<path d="${line} L ${x(s.length - 1).toFixed(1)} ${(CH.t + ih).toFixed(1)} L ${CH.l.toFixed(1)} ${(CH.t + ih).toFixed(1)} Z" fill="url(#chFill)"/>`
+          : "";
+      const last = s[s.length - 1];
+      const endDot = `<circle cx="${x(s.length - 1).toFixed(1)}" cy="${y(last).toFixed(1)}" r="3.6" fill="${stroke}"/>`;
+      const lbl = single
+        ? `<text x="${(x(s.length - 1) - 6).toFixed(1)}" y="${(y(last) - 9).toFixed(1)}" class="ch-vlabel" text-anchor="end">${fmtNum(last)}</text>`
+        : "";
+      // Per-point transparent hover targets drive the tooltip.
+      const hover = pts
+        .map(
+          (p, i) =>
+            `<circle class="ch-dot" data-v="${fmtNum(s[i])}" cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="8"/>`,
+        )
+        .join("");
+      return `${fill}<path d="${line}" fill="none" stroke="${stroke}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>${endDot}${lbl}${hover}`;
+    })
+    .join("");
+  return `<svg viewBox="0 0 ${CH_W} ${CH_H}" class="chart-svg" role="img" aria-label="line chart">${grad}${yGrid(minV, maxV, y)}${xTicks(d.categories, n, x)}${paths}</svg>`;
+}
+
+function barChartSvg(d: ChartData): string {
+  const s = (d.series[0] ?? []).slice(0, 12);
+  const iw = CH_W - CH.l - CH.r;
+  const ih = CH_H - CH.t - CH.b;
+  const maxV = Math.max(1, ...s);
+  const minV = Math.min(0, ...s);
+  const span = maxV - minV || 1;
+  const y = (v: number) => CH.t + ih - ((v - minV) / span) * ih;
+  const gap = 12;
+  const bw = (iw - gap * (s.length - 1)) / Math.max(s.length, 1);
+  const base = CH.t + ih;
+  const bars = s
     .map((v, i) => {
-      const h = 24 + v * (H - 40);
-      const x = i * (bw + gap);
-      const y = H - h;
-      const fill = i === vals.length - 1 ? "var(--chart-1)" : "var(--chart-2)";
-      return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="6" fill="${fill}" opacity="${i === vals.length - 1 ? 1 : 0.85}"/>`;
+      const bx = CH.l + i * (bw + gap);
+      const by = y(v);
+      const h = base - by;
+      const fill = i === s.length - 1 ? "var(--chart-1)" : "var(--chart-2)";
+      const lbl =
+        s.length <= 9
+          ? `<text x="${(bx + bw / 2).toFixed(1)}" y="${(by - 6).toFixed(1)}" class="ch-vlabel" text-anchor="middle">${fmtNum(v)}</text>`
+          : "";
+      return `<rect class="ch-bar" data-v="${fmtNum(v)}" x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0, h).toFixed(1)}" rx="6" fill="${fill}" opacity="${i === s.length - 1 ? 1 : 0.82}"/>${lbl}`;
     })
     .join("");
-  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" class="chart-svg" role="img" aria-label="bar chart">${bars}</svg>`;
+  const xc = (i: number) => CH.l + i * (bw + gap) + bw / 2;
+  return `<svg viewBox="0 0 ${CH_W} ${CH_H}" class="chart-svg" role="img" aria-label="bar chart">${yGrid(minV, maxV, y)}${xTicks(d.categories, s.length, xc)}${bars}</svg>`;
 }
 
-function lineChartSvg(): string {
-  const vals = wave(8);
-  const W = 600;
-  const H = 200;
-  const P = 6;
-  const pts = vals.map((v, i) => {
-    const x = P + (i * (W - 2 * P)) / (vals.length - 1);
-    const y = H - P - v * (H - 2 * P);
-    return [x, y] as const;
-  });
-  const line = pts.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ");
-  const area = `${line} L ${pts[pts.length - 1][0].toFixed(1)} ${H - P} L ${pts[0][0].toFixed(1)} ${H - P} Z`;
-  const grid = [0, 0.33, 0.66, 1]
-    .map((f) => {
-      const y = (P + f * (H - 2 * P)).toFixed(1);
-      return `<line x1="${P}" y1="${y}" x2="${W - P}" y2="${y}" stroke="var(--border)" stroke-width="1"/>`;
-    })
-    .join("");
-  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" class="chart-svg" role="img" aria-label="line chart">
-    ${grid}
-    <path d="${area}" fill="var(--chart-fill)"/>
-    <path d="${line}" fill="none" stroke="var(--chart-1)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
-  </svg>`;
+function stackedBarSvg(d: ChartData): string {
+  const groups = Math.max(...d.series.map((s) => s.length), 1);
+  const iw = CH_W - CH.l - CH.r;
+  const ih = CH_H - CH.t - CH.b;
+  const totals = Array.from({ length: groups }, (_, g) => d.series.reduce((a, s) => a + (s[g] ?? 0), 0));
+  const maxV = Math.max(1, ...totals);
+  const y = (v: number) => CH.t + ih - (v / maxV) * ih;
+  const gap = 16;
+  const bw = (iw - gap * (groups - 1)) / Math.max(groups, 1);
+  const base = CH.t + ih;
+  const bars = Array.from({ length: groups }, (_, g) => {
+    const bx = CH.l + g * (bw + gap);
+    let yTop = base;
+    return d.series
+      .map((s, si) => {
+        const v = s[g] ?? 0;
+        const h = (v / maxV) * ih;
+        yTop -= h;
+        return `<rect x="${bx.toFixed(1)}" y="${yTop.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0, h).toFixed(1)}" fill="${CHART_COLORS[si % CHART_COLORS.length]}" rx="3"/>`;
+      })
+      .join("");
+  }).join("");
+  const xc = (i: number) => CH.l + i * (bw + gap) + bw / 2;
+  return `<svg viewBox="0 0 ${CH_W} ${CH_H}" class="chart-svg" role="img" aria-label="stacked bar chart">${yGrid(0, maxV, y)}${xTicks(d.categories, groups, xc)}${bars}</svg>`;
 }
 
-function pieChartSvg(): string {
-  const segs = [
-    { v: 38, c: "var(--chart-1)" },
-    { v: 27, c: "var(--chart-2)" },
-    { v: 20, c: "var(--chart-3)" },
-    { v: 15, c: "var(--chart-4)" },
-  ];
-  const total = segs.reduce((a, s) => a + s.v, 0);
+function pieChartSvg(d: ChartData): string {
+  const vals = (d.series[0] ?? []).slice(0, 6).map((v) => Math.abs(v));
+  const labels = d.categories.length ? d.categories : vals.map((_, i) => `Item ${i + 1}`);
+  const total = vals.reduce((a, v) => a + v, 0) || 1;
   const R = 78;
-  const sw = 26;
+  const sw = 28;
   const circ = 2 * Math.PI * R;
   let acc = 0;
-  const rings = segs
-    .map((s) => {
-      const frac = s.v / total;
+  const rings = vals
+    .map((v, i) => {
+      const frac = v / total;
       const dash = frac * circ;
-      const el = `<circle cx="100" cy="100" r="${R}" fill="none" stroke="${s.c}" stroke-width="${sw}" stroke-dasharray="${dash.toFixed(2)} ${(circ - dash).toFixed(2)}" stroke-dashoffset="${(-acc * circ).toFixed(2)}" transform="rotate(-90 100 100)"/>`;
+      const el = `<circle cx="100" cy="100" r="${R}" fill="none" stroke="${CHART_COLORS[i % CHART_COLORS.length]}" stroke-width="${sw}" stroke-dasharray="${dash.toFixed(2)} ${(circ - dash).toFixed(2)}" stroke-dashoffset="${(-acc * circ).toFixed(2)}" transform="rotate(-90 100 100)"/>`;
       acc += frac;
       return el;
     })
     .join("");
-  const legend = segs
-    .map((s) => `<span class="legend"><i style="background:${s.c}"></i>${Math.round((s.v / total) * 100)}%</span>`)
+  const center = `<text x="100" y="94" class="pie-total" text-anchor="middle">${fmtNum(total)}</text><text x="100" y="114" class="pie-total-sub" text-anchor="middle">Total</text>`;
+  const legend = vals
+    .map(
+      (v, i) =>
+        `<span class="legend"><i style="background:${CHART_COLORS[i % CHART_COLORS.length]}"></i><span class="legend-label">${esc(String(labels[i] ?? "").slice(0, 18))}</span><b>${Math.round((v / total) * 100)}%</b></span>`,
+    )
     .join("");
-  return `<div class="pie-wrap"><svg viewBox="0 0 200 200" class="pie-svg" role="img" aria-label="pie chart">${rings}</svg><div class="legend-list">${legend}</div></div>`;
-}
-
-function stackedBarSvg(): string {
-  const groups = 7;
-  const W = 600;
-  const H = 200;
-  const gap = 18;
-  const bw = (W - gap * (groups - 1)) / groups;
-  const colors = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)"];
-  const bars = Array.from({ length: groups }, (_, i) => {
-    const segs = [0.5 + 0.4 * Math.abs(Math.sin(i + 1)), 0.3 + 0.25 * Math.abs(Math.cos(i * 1.3)), 0.18 + 0.18 * Math.abs(Math.sin(i * 0.7))];
-    const totalUnit = segs.reduce((a, b) => a + b, 0);
-    const x = i * (bw + gap);
-    let y = H;
-    return segs
-      .map((s, si) => {
-        const h = (s / totalUnit) * (0.45 + 0.5 * Math.abs(Math.sin(i + 2))) * H;
-        y -= h;
-        return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" fill="${colors[si]}" rx="2"/>`;
-      })
-      .join("");
-  }).join("");
-  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" class="chart-svg" role="img" aria-label="stacked bar chart">${bars}</svg>`;
-}
-
-function multiLineSvg(): string {
-  const W = 600;
-  const H = 200;
-  const P = 6;
-  const series = [
-    { c: "var(--chart-1)", phase: 0 },
-    { c: "var(--chart-2)", phase: 1.6 },
-    { c: "var(--chart-3)", phase: 3.1 },
-  ];
-  const n = 9;
-  const paths = series
-    .map((s) => {
-      const pts = Array.from({ length: n }, (_, i) => {
-        const v = Math.sin((i + 1) * 0.9 + s.phase) * 0.4 + 0.5;
-        const x = P + (i * (W - 2 * P)) / (n - 1);
-        const y = H - P - v * (H - 2 * P);
-        return `${i ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`;
-      }).join(" ");
-      return `<path d="${pts}" fill="none" stroke="${s.c}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
-    })
-    .join("");
-  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" class="chart-svg" role="img" aria-label="multi-line chart">${paths}</svg>`;
+  return `<div class="pie-wrap"><svg viewBox="0 0 200 200" class="pie-svg" role="img" aria-label="donut chart">${rings}${center}</svg><div class="legend-list">${legend}</div></div>`;
 }
 
 function renderChartPanel(section: SchemaSection): string {
   const type = (section.chartType ?? "bar").toLowerCase();
+  const d = chartData(section);
+  const multi = d.series.length >= 2;
   const body =
     type.includes("pie") || type.includes("donut")
-      ? pieChartSvg()
+      ? pieChartSvg(d)
       : type.includes("stack")
-        ? stackedBarSvg()
+        ? multi
+          ? stackedBarSvg(d)
+          : barChartSvg(d)
         : type.includes("multi")
-          ? multiLineSvg()
+          ? lineChartSvg(d, !multi)
           : type.includes("line") || type.includes("area")
-            ? lineChartSvg()
-            : barChartSvg();
+            ? lineChartSvg(d, true)
+            : barChartSvg(d);
+  const legendNames = multi && d.names.some(Boolean)
+    ? `<div class="ch-legend">${d.names
+        .map((nm, i) => (nm ? `<span class="legend"><i style="background:${CHART_COLORS[i % CHART_COLORS.length]}"></i>${esc(nm)}</span>` : ""))
+        .join("")}</div>`
+    : "";
   return `
     <section class="block card">
       <div class="card-head-row">
@@ -302,6 +433,7 @@ function renderChartPanel(section: SchemaSection): string {
         ${section.chartType ? `<span class="pill">${esc(section.chartType)}</span>` : ""}
       </div>
       <div class="chart">${body}</div>
+      ${legendNames}
       ${section.datasetPreset ? `<p class="muted">Dataset: ${esc(section.datasetPreset)}</p>` : ""}
     </section>`;
 }
@@ -324,42 +456,60 @@ function trendHtml(trend?: string): string {
   return `<span class="stat-trend ${down ? "trend-down" : "trend-up"}">${down ? "▾" : "▴"} ${esc(t)}</span>`;
 }
 
-// sparklineSvg draws a tiny deterministic trend line for a stat card.
-function sparklineSvg(seed: string, down: boolean): string {
-  const n = 12;
-  const phase = hashNum(seed) % 7;
+// sparklineSvg draws a tiny trend line for a stat card from real data when the
+// schema provides `spark`, else a seeded-but-varied series whose slope is forced
+// to agree with the card's trend direction (up/down) so it never contradicts it.
+function sparklineSvg(seed: string, down: boolean, data?: number[]): string {
   const W = 120;
-  const H = 32;
+  const H = 34;
   const P = 2;
-  const pts = Array.from({ length: n }, (_, i) => {
-    const v = Math.sin((i + 1 + phase) * 0.85) * 0.42 + 0.5;
+  let vals: number[];
+  if (data && data.length >= 2) {
+    const max = Math.max(...data);
+    const min = Math.min(...data);
+    const span = max - min || 1;
+    vals = data.map((v) => (v - min) / span);
+  } else {
+    const phase = hashNum(seed) % 7;
+    const amp = 0.18 + (hashNum(seed) % 4) * 0.05;
+    vals = Array.from({ length: 12 }, (_, i) => {
+      const slope = (down ? -1 : 1) * (i / 11) * 0.5;
+      return Math.max(0.04, Math.min(0.96, 0.3 + slope + Math.sin((i + 1 + phase) * 0.9) * amp));
+    });
+  }
+  const n = vals.length;
+  const pts = vals.map((v, i) => {
     const x = P + (i * (W - 2 * P)) / (n - 1);
     const y = H - P - v * (H - 2 * P);
     return [x, y] as const;
   });
   const line = pts.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ");
-  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><path d="${line}" fill="none" stroke="${down ? "var(--trend-down)" : "var(--trend-up)"}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>`;
+  const stroke = down ? "var(--trend-down)" : "var(--trend-up)";
+  const fillId = `sp${hashNum(seed)}`;
+  const area = `${line} L ${pts[n - 1][0].toFixed(1)} ${H} L ${pts[0][0].toFixed(1)} ${H} Z`;
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="${fillId}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${stroke}" stop-opacity="0.22"/><stop offset="100%" stop-color="${stroke}" stop-opacity="0"/></linearGradient></defs><path d="${area}" fill="url(#${fillId})"/><path d="${line}" fill="none" stroke="${stroke}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>`;
 }
 
 /* --------------------------------------------------------------- sections */
 function renderStatsGrid(section: SchemaSection): string {
   const items = section.items ?? [];
+  // The first KPI gets a "primary" hero treatment for scale contrast, so the
+  // grid has a clear focal point instead of N identical cards.
   const cards = items
-    .map(
-      (item) => {
-        const down = /^[-−]|down|turun|▼|▾|loss/i.test((item.trend ?? "").trim());
-        return `
-      <article class="stat-card">
+    .map((item, i) => {
+      const down = /^[-−]|down|turun|▼|▾|loss/i.test((item.trend ?? "").trim());
+      const dataNumeric = parseNum(item.value);
+      return `
+      <article class="stat-card${i === 0 ? " stat-card--primary" : ""}" data-countup="${Number.isFinite(dataNumeric) ? esc(item.value) : ""}">
         <div class="stat-top">
           <span class="stat-label">${esc(item.label)}</span>
           <span class="stat-ico">${icon(item.icon || item.label)}</span>
         </div>
         <strong class="stat-value">${esc(item.value)}</strong>
         ${trendHtml(item.trend)}
-        ${sparklineSvg(item.label || item.value, down)}
+        ${sparklineSvg(item.label || item.value, down, item.spark)}
       </article>`;
-      },
-    )
+    })
     .join("");
   return `
     <section class="block">
@@ -399,7 +549,7 @@ function renderFilterToolbar(section: SchemaSection): string {
   const chips = (section.filters ?? []).map((f) => `<span class="chip">${esc(f)}</span>`).join("");
   return `
     <section class="block toolbar card">
-      <input class="search" type="text" placeholder="${esc(section.searchPlaceholder ?? "Search")}" disabled />
+      <span class="search-wrap"><span class="search-ico">${icon("search")}</span><input class="search" type="text" placeholder="${esc(section.searchPlaceholder ?? "Search")}" aria-label="Search" /></span>
       <div class="chips">${chips}</div>
       ${section.primaryAction ? `<button class="primary">${esc(section.primaryAction)}</button>` : ""}
     </section>`;
@@ -411,7 +561,7 @@ function renderFormSection(section: SchemaSection): string {
       (field) => `
       <label class="field">
         <span class="field-label">${esc(field.label)}</span>
-        <input class="field-input" type="${esc(field.type || "text")}" placeholder="${esc(field.hint ?? "")}" disabled />
+        <input class="field-input" type="${esc(field.type || "text")}" placeholder="${esc(field.hint ?? "")}" />
         ${field.hint ? `<span class="field-hint">${esc(field.hint)}</span>` : ""}
       </label>`,
     )
@@ -422,6 +572,52 @@ function renderFormSection(section: SchemaSection): string {
       <div class="form-grid">${fields}</div>
       <button class="primary">${esc(section.submitLabel ?? "Submit")}</button>
     </section>`;
+}
+
+const GOOGLE_SVG =
+  '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="#4285F4" d="M22.5 12.2c0-.7-.06-1.4-.18-2.04H12v3.86h5.9a5.04 5.04 0 0 1-2.19 3.31v2.75h3.54c2.07-1.9 3.25-4.71 3.25-7.88z"/><path fill="#34A853" d="M12 23c2.95 0 5.43-.98 7.24-2.96l-3.54-2.75c-.98.66-2.24 1.05-3.7 1.05-2.85 0-5.26-1.92-6.12-4.5H2.23v2.84A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.88 13.84a6.6 6.6 0 0 1 0-4.22V6.78H2.23a11 11 0 0 0 0 9.9l3.65-2.84z"/><path fill="#EA4335" d="M12 5.32c1.6 0 3.05.55 4.18 1.63l3.14-3.14A11 11 0 0 0 12 1 11 11 0 0 0 2.23 6.78l3.65 2.84C6.74 7.24 9.15 5.32 12 5.32z"/></svg>';
+
+// renderAuthForm draws a real, centered SaaS sign-in card (logo, title, email +
+// password with show-password toggle, remember me, forgot link, primary CTA, a
+// divider and a "Continue with Google" button). Returns just the card; the caller
+// supplies the centering/gradient wrapper (.auth-page or .auth-wrap).
+function renderAuthForm(section: SchemaSection, brand: string): string {
+  const initial = esc((brand.match(/[A-Za-z0-9]/)?.[0] ?? "D").toUpperCase());
+  const fields =
+    section.fields && section.fields.length
+      ? section.fields
+      : [
+          { label: "Email", type: "email", hint: "you@company.com" },
+          { label: "Password", type: "password", hint: "••••••••" },
+        ];
+  const inputs = fields
+    .map((f) => {
+      const isPwd = /password/i.test(`${f.type ?? ""} ${f.label ?? ""}`);
+      const inner = isPwd
+        ? `<span class="af-input-wrap"><input class="af-input" type="password" placeholder="${esc(f.hint ?? "")}" data-pwd /><button type="button" class="af-eye" aria-label="Show password" data-toggle-pwd>${icon("eye")}</button></span>`
+        : `<input class="af-input" type="${esc(f.type || "text")}" placeholder="${esc(f.hint ?? "")}" />`;
+      return `<label class="af-field"><span class="af-label">${esc(f.label)}</span>${inner}</label>`;
+    })
+    .join("");
+  const links = section.actions ?? [];
+  const forgot = esc(links[0] || "Forgot password?");
+  return `
+    <div class="auth-card">
+      <div class="auth-brand"><span class="auth-mark">${initial}</span></div>
+      <h1 class="auth-title">${esc(section.title ?? "Welcome back")}</h1>
+      ${section.subtitle ? `<p class="auth-sub">${esc(section.subtitle)}</p>` : `<p class="auth-sub">Sign in to continue to your workspace</p>`}
+      <form class="auth-form" onsubmit="return false">
+        ${inputs}
+        <div class="auth-row">
+          <label class="af-check"><input type="checkbox" checked /> <span>Remember me</span></label>
+          <a class="af-forgot" href="#">${forgot}</a>
+        </div>
+        <button class="primary af-submit" type="submit">${esc(section.primaryAction ?? section.submitLabel ?? "Sign in")}</button>
+      </form>
+      <div class="auth-divider"><span>or</span></div>
+      <button class="ghost af-google" type="button">${GOOGLE_SVG}<span>Continue with Google</span></button>
+      <p class="auth-foot">${links[1] ? esc(links[1]) : `Don't have an account? <a href="#">Sign up</a>`}</p>
+    </div>`;
 }
 
 function renderActionFooter(section: SchemaSection): string {
@@ -444,7 +640,7 @@ function renderProfileSummary(section: SchemaSection): string {
   return `
     <section class="block card">
       <div class="profile-head">
-        <img class="profile-avatar" src="${avatarUrl(entityName)}" alt="${esc(entityName)} avatar" loading="lazy" />
+        ${avatarBox(entityName, "profile-avatar")}
         <div>
           <h2 class="block-title" style="margin:0">${esc(section.entity ?? section.title ?? "Profile")}</h2>
           ${section.title && section.entity ? `<p class="muted">${esc(section.title)}</p>` : ""}
@@ -457,14 +653,21 @@ function renderProfileSummary(section: SchemaSection): string {
 function renderTabbedContent(section: SchemaSection): string {
   const tabs = section.tabs ?? [];
   const headers = tabs
-    .map((tab, index) => `<button class="tab ${index === 0 ? "active" : ""}">${esc(tab.label)}</button>`)
+    .map((tab, index) => `<button class="tab ${index === 0 ? "active" : ""}" data-tab="${index}">${esc(tab.label)}</button>`)
     .join("");
-  const firstItems = (tabs[0]?.items ?? []).map((item) => `<li>${esc(item)}</li>`).join("");
+  const panels = tabs
+    .map(
+      (tab, index) =>
+        `<ul class="tab-list" data-panel="${index}"${index === 0 ? "" : " hidden"}>${(tab.items ?? [])
+          .map((item) => `<li>${esc(item)}</li>`)
+          .join("")}</ul>`,
+    )
+    .join("");
   return `
-    <section class="block card">
+    <section class="block card tabbed">
       ${section.title ? `<h2 class="block-title">${esc(section.title)}</h2>` : ""}
       <div class="tabs">${headers}</div>
-      <ul class="tab-list">${firstItems}</ul>
+      ${panels}
     </section>`;
 }
 
@@ -510,10 +713,19 @@ function renderNotificationList(section: SchemaSection): string {
 }
 
 function renderPlaceholder(section: SchemaSection, label: string): string {
+  const isEmpty = /empty/i.test(label);
+  const heading = section.title ?? label;
+  const msg = isEmpty
+    ? section.subtitle || "Nothing here yet — items you add will show up in this space."
+    : `${label} preview`;
   return `
     <section class="block card placeholder">
-      <h2 class="block-title">${esc(section.title ?? label)}</h2>
-      <p class="muted">${esc(label)} preview</p>
+      <div class="empty-wrap">
+        <span class="empty-ico">${icon(isEmpty ? "box" : section.type || "file")}</span>
+        <strong class="empty-title">${esc(heading)}</strong>
+        <p class="muted">${esc(msg)}</p>
+        ${section.primaryAction ? `<button class="primary">${esc(section.primaryAction)}</button>` : ""}
+      </div>
     </section>`;
 }
 
@@ -529,7 +741,7 @@ function renderHero(section: SchemaSection): string {
         ${section.subtitle ? `<p class="hero-sub">${esc(section.subtitle)}</p>` : ""}
         ${actions ? `<div class="hero-actions">${actions}</div>` : ""}
       </div>
-      <div class="hero-media"><img src="${photoFor(section.image || section.title, section.title ?? "hero", 720, 480)}" alt="" loading="lazy" /></div>
+      <div class="hero-media">${abstractVisual(section.image || section.title || "hero", section.title || "activity", "hero-visual")}</div>
     </section>`;
 }
 
@@ -538,7 +750,7 @@ function renderGallery(section: SchemaSection): string {
     .map(
       (item) => `
       <figure class="gallery-card">
-        <img src="${photoFor(item.image || item.label, item.label || item.value || "g", 480, 320)}" alt="${esc(item.label)}" loading="lazy" />
+        ${abstractVisual(item.image || item.label, item.label || "layers", "gallery-visual")}
         <figcaption>
           <strong>${esc(item.label)}</strong>
           ${item.value ? `<span class="muted">${esc(item.value)}</span>` : ""}
@@ -599,7 +811,7 @@ function renderTestimonials(section: SchemaSection): string {
       <figure class="quote-card">
         <blockquote class="quote-text">${esc(item.value)}</blockquote>
         <figcaption class="quote-by">
-          <img class="quote-avatar" src="${avatarUrl(item.label || "user")}" alt="" loading="lazy" />
+          ${avatarBox(item.label || "user", "quote-avatar")}
           <span><strong>${esc(item.label)}</strong>${item.trend ? `<small class="muted">${esc(item.trend)}</small>` : ""}</span>
         </figcaption>
       </figure>`,
@@ -802,6 +1014,8 @@ function renderSection(section: SchemaSection): string {
       return renderKanban(section);
     case "calendarView":
       return renderCalendar(section);
+    case "authForm":
+      return `<div class="auth-wrap">${renderAuthForm(section, "DashboardCraft")}</div>`;
     default:
       return renderPlaceholder(section, section.type || "Section");
   }
@@ -853,27 +1067,162 @@ function activeNavIndex(items: NavEntry[], schema: PageSchema): number {
   return Math.min(2, items.length - 1);
 }
 
+function brandFor(schema: PageSchema, opts: PreviewOptions): string {
+  return schema.brand?.trim() || opts.brand?.trim() || "DashboardCraft";
+}
+
+// Nav is PROMPT-DRIVEN: use the model-provided product menu (schema.nav) when it
+// gave one, else fall back to the domain default. This is why two different
+// briefs no longer share the same canned sidebar.
+function navItemsFor(schema: PageSchema): NavEntry[] {
+  if (schema.nav && schema.nav.length >= 3) {
+    return schema.nav.slice(0, 8).map((label) => ({ label: String(label), icon: String(label) }));
+  }
+  return navForDomain(schema.domain);
+}
+
+// A horizontal top-nav shell, an alternative to the sidebar — chosen by the model
+// via layout (e.g. "top-nav") so lighter/portal/marketing products look different
+// from data-heavy admin apps.
+function wantsTopNav(schema: PageSchema): boolean {
+  return /top[-\s]?nav|navbar|horizontal/.test((schema.layout ?? "").toLowerCase());
+}
+
+function renderTopNav(schema: PageSchema, opts: PreviewOptions): string {
+  const brand = brandFor(schema, opts);
+  const items = navItemsFor(schema);
+  const activeIdx = activeNavIndex(items, schema);
+  const initial = esc((brand.match(/[A-Za-z0-9]/)?.[0] ?? "D").toUpperCase());
+  const links = items
+    .slice(0, 6)
+    .map((it, i) => `<a class="tn-link ${i === activeIdx ? "active" : ""}">${esc(it.label)}</a>`)
+    .join("");
+  return `
+    <header class="tn-bar">
+      <div class="tn-brand"><span class="brand-mark">${initial}</span><span class="brand-text">${esc(brand)}</span></div>
+      <nav class="tn-nav">${links}</nav>
+      <div class="tn-actions"><button class="t-btn" aria-label="Notifications"><span class="t-badge"></span>${icon("bell")}</button>${avatarBox(brand, "t-avatar")}</div>
+    </header>`;
+}
+
 function renderSidebar(schema: PageSchema, opts: PreviewOptions): string {
-  const brand = opts.brand?.trim() || "DashboardCraft";
-  const items = navForDomain(schema.domain);
+  const brand = brandFor(schema, opts);
+  const items = navItemsFor(schema);
   const activeIdx = activeNavIndex(items, schema);
   const navLink = (it: NavEntry, active: boolean) =>
     `<a class="nav-item ${active ? "active" : ""}"><span class="nav-ico">${icon(it.icon)}</span><span class="nav-text">${esc(it.label)}</span></a>`;
   const mainLinks = items.map((it, i) => navLink(it, i === activeIdx)).join("");
   const secondary = NAV_SECONDARY.map((it) => navLink(it, false)).join("");
+  const initial = esc((brand.match(/[A-Za-z0-9]/)?.[0] ?? "D").toUpperCase());
   return `
     <aside class="sidebar">
-      <div class="brand"><span class="brand-mark">&#9670;</span><span class="brand-text">${esc(brand)}</span></div>
+      <div class="brand"><span class="brand-mark">${initial}</span><span class="brand-text">${esc(brand)}</span></div>
       <div class="nav-label">Menu</div>
       ${mainLinks}
       <div class="nav-label">Workspace</div>
       ${secondary}
       <div class="sidebar-foot">
-        <span class="avatar"></span>
-        <small>${esc(brand)}<br/><span class="muted">${esc((schema.domain || "workspace").replace(/^./, (c) => c.toUpperCase()))}</span></small>
+        ${avatarBox("Admin", "avatar")}
+        <small><strong>Admin</strong><br/><span class="muted">${esc((schema.domain || "workspace").replace(/^./, (c) => c.toUpperCase()))}</span></small>
       </div>
     </aside>`;
 }
+
+// Vanilla runtime INSIDE the sandboxed preview (allow-scripts). Makes the output
+// behave like a real app: tab switching, toast notifications, clickable modals
+// (table-row detail + create dialogs), form validation with loading states, chart
+// hover tooltips, and KPI count-up. It never touches the parent frame.
+const PREVIEW_JS = `<script>
+(function(){
+  var rm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function toastRoot(){ var r=document.getElementById('ui-toast'); if(!r){ r=document.createElement('div'); r.id='ui-toast'; document.body.appendChild(r); } return r; }
+  function showToast(msg, kind){
+    var t=document.createElement('div'); t.className='ui-toast-item '+(kind||'');
+    t.innerHTML='<span class="ui-toast-dot"></span><span>'+msg+'</span>';
+    toastRoot().appendChild(t);
+    requestAnimationFrame(function(){ t.classList.add('in'); });
+    setTimeout(function(){ t.classList.remove('in'); setTimeout(function(){ t.remove(); },240); }, 2600);
+  }
+  function closeModal(){ var m=document.getElementById('ui-modal'); if(m){ m.classList.remove('in'); setTimeout(function(){ if(m.parentNode) m.parentNode.removeChild(m); },180); } }
+  function openModal(title, body){
+    closeModal();
+    var m=document.createElement('div'); m.id='ui-modal'; m.className='ui-modal';
+    m.innerHTML='<div class="ui-modal-backdrop" data-mclose></div><div class="ui-modal-card" role="dialog" aria-modal="true"><div class="ui-modal-head"><h3>'+title+'</h3><button class="ui-modal-x" data-mclose aria-label="Close">&times;</button></div><div class="ui-modal-body">'+body+'</div></div>';
+    document.body.appendChild(m);
+    requestAnimationFrame(function(){ m.classList.add('in'); });
+  }
+  function createForm(){ return '<label class="ui-field"><span>Name</span><input class="ui-minput" placeholder="Enter a name" /></label><label class="ui-field"><span>Owner</span><input class="ui-minput" placeholder="Assign an owner" /></label><div class="ui-modal-actions"><button class="ghost" data-mclose>Cancel</button><button class="primary" data-mcreate>Create</button></div>'; }
+  function isEmail(v){ var a=v.indexOf('@'); return a>0 && v.indexOf('.',a)>a+1 && v.indexOf(' ')<0; }
+  function validateScope(scope){
+    var inputs=scope.querySelectorAll('input'); var ok=true;
+    for(var i=0;i<inputs.length;i++){ (function(inp){
+      var wrap=inp.closest('label')||inp.parentNode; var old=wrap.querySelector('.ui-err'); if(old) old.remove(); inp.classList.remove('is-invalid');
+      if(inp.type==='checkbox') return;
+      var v=(inp.value||'').trim(); var msg='';
+      if(v==='') msg='This field is required';
+      else if(inp.type==='email' && !isEmail(v)) msg='Enter a valid email';
+      else if(inp.type==='password' && v.length<6) msg='Use at least 6 characters';
+      if(msg){ ok=false; inp.classList.add('is-invalid'); var e=document.createElement('span'); e.className='ui-err'; e.textContent=msg; wrap.appendChild(e); }
+    })(inputs[i]); }
+    return ok;
+  }
+
+  document.addEventListener('click', function(ev){
+    var t=ev.target;
+    if(t.closest('[data-mcreate]')){ var mm=t.closest('.ui-modal'); var mi=mm&&mm.querySelector('.ui-minput'); if(mi && !mi.value.trim()){ mi.classList.add('is-invalid'); return; } closeModal(); showToast('Created successfully','ok'); return; }
+    if(t.closest('[data-mclose]')){ closeModal(); return; }
+    var pwd=t.closest('[data-toggle-pwd]'); if(pwd){ var pi=pwd.parentNode.querySelector('[data-pwd]'); if(pi){ pi.type = pi.type==='password'?'text':'password'; pwd.setAttribute('aria-label', pi.type==='password'?'Show password':'Hide password'); } return; }
+    var tr=t.closest('.table-wrap tbody tr');
+    if(tr && !tr.querySelector('.empty')){
+      var table=tr.closest('table'); var heads=table?table.querySelectorAll('thead th'):[]; var cells=tr.querySelectorAll('td'); var body='';
+      for(var c=0;c<cells.length;c++){ var h=heads[c]?heads[c].textContent:('Field '+(c+1)); body+='<div class="ui-kv"><span>'+h+'</span><strong>'+cells[c].innerHTML+'</strong></div>'; }
+      openModal('Record details', body+'<div class="ui-modal-actions"><button class="primary" data-mclose>Close</button></div>');
+      return;
+    }
+    var btn=t.closest('button, .af-google'); if(!btn || btn.classList.contains('tab') || btn.classList.contains('ui-modal-x')) return;
+    var label=(btn.textContent||'').trim();
+    if(btn.classList.contains('af-google')){ ev.preventDefault(); showToast('Signing in with Google…'); return; }
+    var card=btn.closest('.card, .auth-card, .toolbar');
+    var isSubmit=btn.getAttribute('type')==='submit' || btn.classList.contains('af-submit');
+    if(card && card.querySelector('input') && (isSubmit || /save|submit|sign in|apply|search/i.test(label))){
+      ev.preventDefault(); var scope=btn.closest('form')||card;
+      if(!validateScope(scope)){ showToast('Please fix the highlighted fields','bad'); return; }
+      var orig=btn.innerHTML; btn.disabled=true; btn.innerHTML='<span class="ui-spin"></span>Working…';
+      setTimeout(function(){ btn.disabled=false; btn.innerHTML=orig; showToast((label||'Saved')+' — success','ok'); }, 850);
+      return;
+    }
+    if(/create|new|add|invite|tambah|buat/i.test(label)){ ev.preventDefault(); openModal(label, createForm()); return; }
+    if(btn.classList.contains('primary')||btn.classList.contains('ghost')||btn.classList.contains('t-btn')||btn.classList.contains('price-cta')){ ev.preventDefault(); showToast(label||'Done'); }
+  });
+  document.addEventListener('keydown', function(ev){ if(ev.key==='Escape') closeModal(); });
+
+  var groups=document.querySelectorAll('.tabbed');
+  for(var g=0; g<groups.length; g++){ (function(sec){
+    var tabs=sec.querySelectorAll('.tab'); var panels=sec.querySelectorAll('[data-panel]');
+    for(var i=0;i<tabs.length;i++){ tabs[i].addEventListener('click', function(){ var idx=this.getAttribute('data-tab'); for(var k=0;k<tabs.length;k++) tabs[k].classList.toggle('active', tabs[k]===this); for(var p=0;p<panels.length;p++) panels[p].hidden=panels[p].getAttribute('data-panel')!==idx; }); }
+  })(groups[g]); }
+
+  var tip;
+  document.addEventListener('mouseover', function(ev){ var d=ev.target.closest('[data-v]'); if(!d) return; if(!tip){ tip=document.createElement('div'); tip.className='ui-chart-tip'; document.body.appendChild(tip); } tip.textContent=d.getAttribute('data-v'); var r=d.getBoundingClientRect(); tip.style.left=(r.left+r.width/2)+'px'; tip.style.top=(r.top-10)+'px'; tip.classList.add('in'); });
+  document.addEventListener('mouseout', function(ev){ if(tip && ev.target.closest('[data-v]')) tip.classList.remove('in'); });
+
+  if(rm) return;
+  var ccards=document.querySelectorAll('[data-countup]');
+  for(var c=0;c<ccards.length;c++){ (function(card){
+    var raw=card.getAttribute('data-countup'); var valEl=card.querySelector('.stat-value'); if(!raw||!valEl) return;
+    var i=0; while(i<raw.length && (raw[i]<'0'||raw[i]>'9')) i++;
+    var j=raw.length; while(j>i && (raw[j-1]<'0'||raw[j-1]>'9')) j--;
+    if(j<=i) return;
+    var prefix=raw.slice(0,i), suffix=raw.slice(j), numStr=raw.slice(i,j).replace(/,/g,'');
+    var target=parseFloat(numStr); if(!isFinite(target)) return;
+    var dotp=numStr.indexOf('.'), dec=dotp>=0?numStr.length-dotp-1:0, dur=900, start=null;
+    function fmt(n){ return prefix + (dec===0 ? Math.round(n).toLocaleString('en-US') : n.toFixed(dec)) + suffix; }
+    function step(ts){ if(!start)start=ts; var tt=Math.min(1,(ts-start)/dur); valEl.textContent=fmt(target*(1-Math.pow(1-tt,3))); if(tt<1) requestAnimationFrame(step); else valEl.textContent=raw; }
+    valEl.textContent=fmt(0); requestAnimationFrame(step);
+  })(ccards[c]); }
+})();
+</script>`;
 
 export function renderPreview(schema: PageSchema, opts: PreviewOptions = {}): string {
   const sections = `<div class="grid">${(schema.sections ?? [])
@@ -890,15 +1239,33 @@ export function renderPreview(schema: PageSchema, opts: PreviewOptions = {}): st
       ${subtitle ? `<p>${esc(subtitle)}</p>` : ""}
     </header>`;
 
-  const body = shell
+  // Login = a centered auth card on a gradient, NOT the admin shell / page-head.
+  const authSection =
+    (schema.sections ?? []).find((s) => s.type === "authForm") ??
+    (schema.sections ?? []).find((s) => s.type === "formSection");
+  const isAuthPage =
+    !shell &&
+    ((schema.pageType ?? "").toLowerCase() === "login" ||
+      (schema.sections ?? []).some((s) => s.type === "authForm"));
+
+  const body = shell && wantsTopNav(schema)
+    ? `<div class="tn-wrap">
+    ${renderTopNav(schema, opts)}
+    <main class="tn-page">
+      ${head}
+      ${sections}
+    </main>
+  </div>`
+    : shell
     ? `<div class="shell">
     ${renderSidebar(schema, opts)}
     <div class="main">
       <div class="topbar">
         <div class="crumb">${esc(schema.title)}<span> · ${esc(schema.domain || "custom")}</span></div>
         <div class="topbar-actions">
-          <span class="search-top">Search…</span>
-          <span class="t-avatar"></span>
+          <span class="search-top"><span class="search-top-ico">${icon("search")}</span><input type="text" placeholder="Search…" aria-label="Search" /></span>
+          <button class="t-btn" aria-label="Notifications"><span class="t-badge"></span>${icon("bell")}</button>
+          ${avatarBox(brandFor(schema, opts), "t-avatar")}
         </div>
       </div>
       <main class="page">
@@ -907,7 +1274,12 @@ export function renderPreview(schema: PageSchema, opts: PreviewOptions = {}): st
       </main>
     </div>
   </div>`
-    : `<main class="page solo">
+    : isAuthPage
+      ? `<main class="auth-page">${renderAuthForm(
+          authSection ?? { type: "authForm", title: schema.title },
+          opts.brand?.trim() || schema.title || "DashboardCraft",
+        )}</main>`
+      : `<main class="page solo">
     ${head}
     ${sections}
   </main>`;
@@ -939,12 +1311,22 @@ body{margin:0;background:var(--content-bg);color:var(--fg);font-family:var(--fon
 .sidebar-foot .avatar{width:30px;height:30px;border-radius:999px;background:var(--sidebar-active-bg);flex-shrink:0}
 .sidebar-foot small{color:var(--sidebar-muted);font-size:11px;line-height:1.3}
 .main{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--content-bg)}
-.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 28px;border-bottom:1px solid var(--topbar-border);background:var(--topbar-bg);color:var(--topbar-fg)}
-.topbar .crumb{font-weight:700;font-size:14px}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 28px;border-bottom:1px solid var(--topbar-border);background:var(--topbar-bg);color:var(--topbar-fg);min-width:0}
+.topbar .crumb{font-weight:700;font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .topbar .crumb span{opacity:.6;font-weight:500}
-.topbar-actions{display:flex;align-items:center;gap:10px}
+.topbar-actions{display:flex;align-items:center;gap:10px;flex-shrink:0}
 .search-top{border:1px solid color-mix(in srgb,var(--topbar-fg) 22%,transparent);border-radius:var(--radius);padding:8px 14px;font-size:13px;color:color-mix(in srgb,var(--topbar-fg) 65%,transparent);min-width:200px}
 .t-avatar{width:32px;height:32px;border-radius:999px;background:color-mix(in srgb,var(--topbar-fg) 18%,transparent);flex-shrink:0}
+.tn-wrap{display:flex;flex-direction:column;min-height:100vh;background:var(--content-bg)}
+.tn-bar{display:flex;align-items:center;gap:20px;padding:12px 28px;border-bottom:1px solid var(--topbar-border);background:var(--topbar-bg);color:var(--topbar-fg);position:sticky;top:0;z-index:5}
+.tn-brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:15px;flex-shrink:0}
+.tn-nav{display:flex;align-items:center;gap:4px;flex:1;overflow-x:auto}
+.tn-link{padding:8px 14px;border-radius:var(--radius);font-size:14px;font-weight:600;color:color-mix(in srgb,var(--topbar-fg) 70%,transparent);cursor:pointer;white-space:nowrap;transition:background .15s,color .15s}
+.tn-link:hover{background:color-mix(in srgb,var(--topbar-fg) 8%,transparent);color:var(--topbar-fg)}
+.tn-link.active{background:var(--primary);color:var(--primary-fg)}
+.tn-actions{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.tn-page{padding:28px 32px;display:flex;flex-direction:column;gap:22px;max-width:1280px;margin:0 auto;width:100%}
+@media(max-width:760px){.tn-page{padding:18px}.tn-bar{padding:12px 16px;gap:12px}}
 .page{padding:28px 32px;display:flex;flex-direction:column;gap:22px}
 .page.solo{max-width:1180px;margin:0 auto;width:100%}
 .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:20px;align-items:start;grid-auto-flow:row dense}
@@ -971,15 +1353,60 @@ body{margin:0;background:var(--content-bg);color:var(--fg);font-family:var(--fon
 .spark{width:100%;height:30px;margin-top:6px;display:block;opacity:.85}
 .trend-up{color:var(--trend-up,#16a34a)}
 .trend-down{color:var(--trend-down,#dc2626)}
+/* Hero KPI: scale contrast so the grid has a focal point, not N identical cards. */
+.stat-card--primary{grid-column:span 2;background:linear-gradient(135deg,color-mix(in srgb,var(--primary) 9%,var(--card)),var(--card));border-color:color-mix(in srgb,var(--primary) 22%,var(--border))}
+.stat-card--primary .stat-value{font-size:40px;letter-spacing:-.01em}
+.stat-card--primary .stat-ico{background:var(--primary);color:var(--primary-fg)}
+@media(max-width:760px){.stat-card--primary{grid-column:auto}.stat-card--primary .stat-value{font-size:32px}}
+/* Interaction + motion: make it feel like an app, not a screenshot. */
+.card,.stat-card,.gallery-card,.feature-card,.kb-card{transition:box-shadow .18s ease,transform .18s ease,border-color .18s ease}
+.stat-card:hover,.gallery-card:hover,.feature-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg,0 12px 28px -10px color-mix(in srgb,var(--fg) 22%,transparent))}
+.nav-item,.tab,.primary,.ghost,.chip,.field-input,.search,.t-btn{transition:background .15s ease,color .15s ease,box-shadow .15s ease,transform .12s ease,border-color .15s ease}
+.primary:hover{filter:brightness(1.06)}
+.primary:active,.ghost:active,.t-btn:active{transform:translateY(1px)}
+.ghost:hover{background:var(--muted);border-color:color-mix(in srgb,var(--fg) 18%,var(--border))}
+a,button{outline:none}
+:where(a,button,input,.tab,.nav-item):focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:var(--radius)}
+.field-input:focus,.search:focus{border-color:var(--primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 18%,transparent);color:var(--fg)}
+@keyframes blockIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:no-preference){.cell{animation:blockIn .5s cubic-bezier(.16,1,.3,1) both}.cell:nth-child(2){animation-delay:.05s}.cell:nth-child(3){animation-delay:.1s}.cell:nth-child(4){animation-delay:.15s}.cell:nth-child(n+5){animation-delay:.2s}}
+/* Live search field + topbar chrome */
+.search-wrap{flex:1;min-width:200px;display:flex;align-items:center;gap:8px;border:var(--border-width,1px) solid var(--border);border-radius:var(--radius);background:var(--card);padding:0 12px}
+.search-wrap:focus-within{border-color:var(--primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 16%,transparent)}
+.search-wrap .search-ico{display:flex;color:var(--muted-fg)}.search-wrap .search-ico .ic{width:16px;height:16px}
+.search-wrap .search{flex:1;border:0;background:transparent;box-shadow:none;padding:10px 0;color:var(--fg)}
+.search-wrap .search:focus{box-shadow:none}
+.search-top{display:flex;align-items:center;gap:8px;border:1px solid color-mix(in srgb,var(--topbar-fg) 22%,transparent);border-radius:var(--radius);padding:0 12px;min-width:0;flex:0 1 220px}
+.search-top:focus-within{border-color:var(--primary)}
+.search-top .search-top-ico{display:flex;color:color-mix(in srgb,var(--topbar-fg) 60%,transparent)}.search-top .search-top-ico .ic{width:15px;height:15px}
+.search-top input{border:0;background:transparent;outline:none;padding:9px 0;font-size:13px;color:var(--topbar-fg);width:100%}
+.t-btn{position:relative;display:flex;align-items:center;justify-content:center;width:36px;height:36px;border:1px solid color-mix(in srgb,var(--topbar-fg) 16%,transparent);border-radius:var(--radius);background:transparent;color:var(--topbar-fg);cursor:pointer}
+.t-btn:hover{background:color-mix(in srgb,var(--topbar-fg) 8%,transparent)}
+.t-btn .ic{width:17px;height:17px}
+.t-badge{position:absolute;top:7px;right:8px;width:7px;height:7px;border-radius:999px;background:var(--trend-down,#dc2626)}
+img.t-avatar{object-fit:cover}
+img.avatar{object-fit:cover;border:1px solid var(--sidebar-border)}
+.sidebar-foot small strong{color:var(--sidebar-title);font-weight:700}
 .card-head-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
 .card-head-row .block-title{margin:0}
 .chart{width:100%}
-.chart-svg{width:100%;height:190px;display:block}
+.chart-svg{width:100%;height:auto;display:block;overflow:visible}
+.ch-grid{stroke:var(--border);stroke-width:1;opacity:.55}
+.ch-ytick{fill:var(--muted-fg);font-size:11px;font-weight:600}
+.ch-xtick{fill:var(--muted-fg);font-size:11px;font-weight:600}
+.ch-vlabel{fill:var(--fg);font-size:12px;font-weight:800}
+.ch-bar{transition:opacity .12s}.ch-bar:hover{opacity:1}
+.ch-dot{fill:transparent;transition:fill .12s}.ch-dot:hover{fill:color-mix(in srgb,var(--chart-1) 24%,transparent)}
+.ch-legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:12px}
 .pie-wrap{display:flex;align-items:center;gap:32px;flex-wrap:wrap;justify-content:center}
 .pie-svg{width:190px;height:190px;flex-shrink:0}
-.legend-list{display:flex;flex-direction:column;gap:10px}
+.pie-total{fill:var(--fg);font-size:26px;font-weight:800}
+.pie-total-sub{fill:var(--muted-fg);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+.legend-list{display:flex;flex-direction:column;gap:10px;min-width:140px}
 .legend{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted-fg);font-weight:600}
-.legend i{width:12px;height:12px;border-radius:3px;display:inline-block}
+.legend i{width:12px;height:12px;border-radius:3px;display:inline-block;flex-shrink:0}
+.legend .legend-label{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.legend b{color:var(--fg);font-variant-numeric:tabular-nums}
 .table-title{padding:18px 20px 0}
 .table-wrap{overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:14px}
@@ -1030,6 +1457,84 @@ td.empty{text-align:center;color:var(--muted-fg);padding:26px}
 .notif-dot.badge-bad{background:var(--trend-down,#dc2626)}
 .notif-item div{display:flex;flex-direction:column;gap:2px}
 .placeholder{border-style:dashed}
+.empty-wrap{display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;padding:26px 16px}
+.empty-ico{width:48px;height:48px;border-radius:14px;background:var(--accent);color:var(--accent-fg);display:flex;align-items:center;justify-content:center}
+.empty-ico .ic{width:24px;height:24px}
+.empty-title{font-size:15px;font-weight:800}
+.empty-wrap .primary{margin-top:6px}
+/* Auth / login screen */
+.auth-page{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:radial-gradient(1100px 560px at 50% -10%,color-mix(in srgb,var(--primary) 16%,var(--content-bg)),var(--content-bg))}
+.auth-wrap{display:flex;justify-content:center;padding:8px}
+.auth-card{width:100%;max-width:400px;background:var(--card);border:var(--border-width,1px) solid var(--border);border-radius:calc(var(--radius) + 6px);box-shadow:0 24px 60px -20px color-mix(in srgb,var(--fg) 28%,transparent);padding:32px}
+.auth-brand{display:flex;justify-content:center;margin-bottom:18px}
+.auth-mark{width:48px;height:48px;border-radius:14px;background:var(--primary);color:var(--primary-fg);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px}
+.auth-title{margin:0;text-align:center;font-size:24px;font-weight:800}
+.auth-sub{margin:6px 0 22px;text-align:center;color:var(--muted-fg);font-size:14px}
+.auth-form{display:grid;gap:14px}
+.af-field{display:grid;gap:6px}
+.af-label{font-size:13px;font-weight:600}
+.af-input-wrap{position:relative;display:flex;align-items:center}
+.af-input{width:100%;border:var(--border-width,1px) solid var(--border);border-radius:var(--radius);padding:10px 12px;font-size:14px;background:var(--card);color:var(--fg);transition:border-color .15s,box-shadow .15s}
+.af-input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 18%,transparent)}
+.af-input-wrap .af-input{padding-right:40px}
+.af-eye{position:absolute;right:8px;display:grid;place-items:center;width:28px;height:28px;border:0;background:transparent;color:var(--muted-fg);cursor:pointer;border-radius:8px}
+.af-eye:hover{background:var(--muted);color:var(--fg)}
+.af-eye .ic{width:16px;height:16px}
+.auth-row{display:flex;align-items:center;justify-content:space-between;font-size:13px;margin-top:2px}
+.af-check{display:flex;align-items:center;gap:7px;color:var(--muted-fg);cursor:pointer}
+.af-forgot{color:var(--primary);font-weight:600;text-decoration:none}
+.af-forgot:hover{text-decoration:underline}
+.af-submit{width:100%;justify-content:center;margin-top:4px;padding:11px}
+.auth-divider{display:flex;align-items:center;gap:12px;color:var(--muted-fg);font-size:12px;margin:18px 0}
+.auth-divider::before,.auth-divider::after{content:"";height:1px;flex:1;background:var(--border)}
+.af-google{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:11px}
+.auth-foot{margin:18px 0 0;text-align:center;font-size:13px;color:var(--muted-fg)}
+.auth-foot a{color:var(--primary);font-weight:600;text-decoration:none}
+/* No default images: CSS initials avatars + branded gradient media */
+.av-initials{display:grid;place-items:center;font-weight:800;color:#fff;overflow:hidden;background:linear-gradient(135deg,var(--primary),color-mix(in srgb,var(--primary) 45%,var(--accent)));flex-shrink:0}
+.profile-avatar.av-initials{font-size:20px}
+.quote-avatar.av-initials{font-size:14px}
+.t-avatar.av-initials{font-size:13px}
+.sidebar-foot .avatar.av-initials{font-size:12px}
+.media-visual{width:100%;height:100%;display:grid;place-items:center;position:relative;overflow:hidden;background:linear-gradient(135deg,color-mix(in srgb,var(--primary) 92%,#000),color-mix(in srgb,var(--primary) 42%,var(--accent)));filter:hue-rotate(var(--mv-h,0deg))}
+.media-visual::before{content:"";position:absolute;inset:0;background-image:radial-gradient(60% 60% at 24% 18%,rgba(255,255,255,.24),transparent 60%),radial-gradient(52% 52% at 86% 84%,rgba(255,255,255,.14),transparent 55%)}
+.media-visual::after{content:"";position:absolute;inset:0;background-image:linear-gradient(transparent 94%,rgba(255,255,255,.10) 94%),linear-gradient(90deg,transparent 94%,rgba(255,255,255,.10) 94%);background-size:24px 24px;opacity:.5}
+.media-ico{position:relative;color:#fff;opacity:.95}
+.media-ico .ic{width:56px;height:56px}
+.gallery-card .media-visual{height:150px}
+.gallery-card .media-ico .ic{width:38px;height:38px}
+/* Interactive runtime: toast, modal, validation, chart tooltip */
+#ui-toast{position:fixed;right:16px;bottom:16px;z-index:9999;display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+.ui-toast-item{display:flex;align-items:center;gap:9px;background:var(--card);color:var(--fg);border:1px solid var(--border);border-radius:12px;box-shadow:0 14px 34px -10px rgba(0,0,0,.32);padding:11px 15px;font-size:13px;font-weight:600;opacity:0;transform:translateY(8px);transition:opacity .22s,transform .22s;max-width:320px}
+.ui-toast-item.in{opacity:1;transform:none}
+.ui-toast-dot{width:8px;height:8px;border-radius:999px;background:var(--primary);flex-shrink:0}
+.ui-toast-item.ok .ui-toast-dot{background:var(--trend-up,#16a34a)}
+.ui-toast-item.bad .ui-toast-dot{background:var(--trend-down,#dc2626)}
+.ui-modal{position:fixed;inset:0;z-index:9998;display:grid;place-items:center;padding:20px}
+.ui-modal-backdrop{position:absolute;inset:0;background:rgba(8,15,40,.5);opacity:0;transition:opacity .2s;backdrop-filter:blur(2px)}
+.ui-modal.in .ui-modal-backdrop{opacity:1}
+.ui-modal-card{position:relative;width:100%;max-width:440px;background:var(--card);color:var(--fg);border:1px solid var(--border);border-radius:calc(var(--radius) + 6px);box-shadow:0 30px 70px -20px rgba(0,0,0,.5);transform:translateY(10px) scale(.98);opacity:0;transition:transform .2s,opacity .2s;max-height:84vh;overflow:auto}
+.ui-modal.in .ui-modal-card{transform:none;opacity:1}
+.ui-modal-head{display:flex;align-items:center;justify-content:space-between;padding:15px 18px;border-bottom:1px solid var(--border)}
+.ui-modal-head h3{margin:0;font-size:16px;font-weight:800}
+.ui-modal-x{border:0;background:transparent;font-size:22px;line-height:1;color:var(--muted-fg);cursor:pointer;width:30px;height:30px;border-radius:8px}
+.ui-modal-x:hover{background:var(--muted);color:var(--fg)}
+.ui-modal-body{padding:18px}
+.ui-field{display:block;margin:0 0 12px}
+.ui-field>span{font-size:13px;font-weight:600}
+.ui-kv{display:flex;justify-content:space-between;gap:14px;padding:9px 0;border-bottom:1px solid var(--border);font-size:14px}
+.ui-kv span{color:var(--muted-fg)}
+.ui-modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:16px}
+.ui-minput{width:100%;border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;font-size:14px;background:var(--card);color:var(--fg);margin-top:4px}
+.ui-minput:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 18%,transparent)}
+.is-invalid{border-color:var(--trend-down,#dc2626) !important;box-shadow:0 0 0 3px color-mix(in srgb,var(--trend-down,#dc2626) 16%,transparent) !important}
+.ui-err{display:block;color:var(--trend-down,#dc2626);font-size:12px;font-weight:600;margin-top:5px}
+.ui-spin{display:inline-block;width:13px;height:13px;border:2px solid currentColor;border-top-color:transparent;border-radius:999px;margin-right:7px;vertical-align:-1px;animation:uispin .7s linear infinite}
+@keyframes uispin{to{transform:rotate(360deg)}}
+.table-wrap tbody tr{cursor:pointer}
+[data-v]{cursor:pointer}
+.ui-chart-tip{position:fixed;z-index:9999;transform:translate(-50%,-100%);background:#081f5c;color:#fff;font-size:12px;font-weight:700;padding:4px 9px;border-radius:7px;pointer-events:none;opacity:0;transition:opacity .12s;white-space:nowrap}
+.ui-chart-tip.in{opacity:1}
 @media(max-width:860px){.sidebar{display:none}.page{padding:18px}}
 .ic{width:18px;height:18px;display:block}
 .stat-ico .ic{width:18px;height:18px}
@@ -1097,11 +1602,30 @@ img.profile-avatar{object-fit:cover;border:1px solid var(--border)}
 .cal-empty{background:var(--muted);border-style:dashed}
 .cal-day{font-size:12px;font-weight:700;color:var(--muted-fg)}
 .cal-event{font-size:10px;font-weight:600;background:var(--accent);color:var(--accent-fg);border-radius:6px;padding:2px 5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* ---- Responsive hardening: never let any surface overflow its width ---- */
+html,body{max-width:100%;overflow-x:hidden}
+.shell,.main,.page,.grid,.cell,.topbar,.card,.block{min-width:0;max-width:100%}
+.chart,.table-wrap{overflow-x:auto}
+.chart-svg{overflow:hidden}
+@media(max-width:860px){
+  .topbar{padding:12px 16px;gap:10px}
+  .topbar .search-top{display:none}
+  .stats-grid{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+}
+@media(max-width:560px){
+  .page{padding:16px}
+  .stats-grid{grid-template-columns:1fr}
+  .hero{padding:22px}
+  .hero-title{font-size:24px}
+  .pie-wrap{gap:18px}
+  .pie-svg{width:150px;height:150px}
+}
 ${ds.css ?? ""}
 </style>
 </head>
 <body>
   ${body}
+  ${PREVIEW_JS}
 </body>
 </html>`;
 }

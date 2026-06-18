@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, LayoutDashboard, CreditCard, Plus } from "lucide-react";
+import { ArrowLeft, LayoutDashboard, CreditCard, Plus, ChevronsUpDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
@@ -9,9 +9,10 @@ interface StudioHeaderProps {
   projectName: string;
   credits: number;
   onTopUp: () => void;
+  onSwitchProject?: () => void;
 }
 
-export function StudioHeader({ projectName, credits, onTopUp }: StudioHeaderProps) {
+export function StudioHeader({ projectName, credits, onTopUp, onSwitchProject }: StudioHeaderProps) {
   return (
     <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-border bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
       <div className="flex min-w-0 items-center gap-3">
@@ -30,12 +31,21 @@ export function StudioHeader({ projectName, credits, onTopUp }: StudioHeaderProp
             <LayoutDashboard className="h-4 w-4" />
           </div>
 
-          <div className="min-w-0">
-            <p className="truncate text-xs font-bold text-foreground">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <p className="shrink-0 text-xs font-bold text-foreground">
               Dashboard Studio
               <span className="mx-1.5 text-muted-foreground">|</span>
-              <span className="font-semibold text-muted-foreground">{projectName}</span>
             </p>
+            <button
+              type="button"
+              onClick={onSwitchProject}
+              disabled={!onSwitchProject}
+              aria-label="Switch or open a project"
+              className="inline-flex min-w-0 items-center gap-1 rounded-md px-1.5 py-0.5 transition-colors hover:bg-muted disabled:hover:bg-transparent"
+            >
+              <span className="truncate text-xs font-semibold text-muted-foreground">{projectName}</span>
+              {onSwitchProject ? <ChevronsUpDown className="size-3 shrink-0 text-muted-foreground" /> : null}
+            </button>
           </div>
         </div>
       </div>

@@ -15,7 +15,6 @@ interface GenerationConfirmDialogProps {
   onOpenChange: (open: boolean) => void;
   prompt: string;
   themeName: string;
-  themeCost: number;
   creditsBalance: number;
   boostPrompt: boolean;
   onBoostPromptChange: (checked: boolean) => void;
@@ -30,7 +29,6 @@ export function GenerationConfirmDialog({
   onOpenChange,
   prompt,
   themeName,
-  themeCost,
   creditsBalance,
   boostPrompt,
   onBoostPromptChange,
