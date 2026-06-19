@@ -23,6 +23,7 @@ import { ApiKeysSettings } from "@/components/settings/api-keys-settings";
 import { BillingSettings } from "@/components/settings/billing-settings";
 import { DangerZone } from "@/components/settings/danger-zone";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Reveal, RevealGroup, RevealItem } from "@/components/ui/reveal";
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<TabKey>("profile");
@@ -58,15 +59,26 @@ export default function SettingsPage() {
   if (loading || !settings) {
     return (
       <AppShell title="Settings" subtitle="Loading preferences...">
-        <div className="grid gap-6">
-          <div className="grid gap-3 md:grid-cols-4">
-            <Skeleton className="h-20 rounded-xl" />
-            <Skeleton className="h-20 rounded-xl" />
-            <Skeleton className="h-20 rounded-xl" />
-            <Skeleton className="h-20 rounded-xl" />
+        <div
+          className="grid gap-6"
+          role="status"
+          aria-busy="true"
+          aria-label="Loading settings"
+        >
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Skeleton className="h-20 rounded-2xl" />
+            <Skeleton className="h-20 rounded-2xl" />
+            <Skeleton className="h-20 rounded-2xl" />
+            <Skeleton className="h-20 rounded-2xl" />
           </div>
-          <Skeleton className="h-10 w-80 rounded-lg" />
-          <Skeleton className="h-[400px] w-full rounded-2xl" />
+          <div className="flex flex-wrap gap-2 rounded-xl bg-muted/60 p-1">
+            <Skeleton className="h-9 w-24 rounded-lg" />
+            <Skeleton className="h-9 w-28 rounded-lg" />
+            <Skeleton className="h-9 w-28 rounded-lg" />
+            <Skeleton className="h-9 w-24 rounded-lg" />
+          </div>
+          <Skeleton className="h-[420px] w-full rounded-2xl" />
+          <span className="sr-only">Loading your settings and preferences</span>
         </div>
       </AppShell>
     );
@@ -74,74 +86,96 @@ export default function SettingsPage() {
 
   return (
     <AppShell title="Settings" subtitle="Manage profile, generation behavior, credits, security, and API access.">
-      <div className="grid gap-6">
-        <SettingsOverview
-          credits={balance?.available ?? 0}
-          monthlyLimit={balance?.monthlyLimit ?? 500}
-          apiKeyCount={apiKeys.length}
-          safeMode={settings.generationPreferences.safeMode}
-        />
+      <RevealGroup className="grid gap-6" stagger={0.05}>
+        <RevealItem>
+          <SettingsOverview
+            credits={balance?.available ?? 0}
+            monthlyLimit={balance?.monthlyLimit ?? 500}
+            apiKeyCount={apiKeys.length}
+            safeMode={settings.generationPreferences.safeMode}
+          />
+        </RevealItem>
 
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabKey)}>
-          <TabsList className="h-auto flex-wrap justify-start rounded-xl bg-muted/60 p-1">
-            {settingsTabs.map((tab) => (
-              <TabsTrigger key={tab.value} value={tab.value} className="rounded-lg">
-                {tab.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
+        <RevealItem>
+          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabKey)}>
+            <TabsList className="h-auto flex-wrap justify-start gap-1 rounded-xl border border-border/70 bg-muted/60 p-1">
+              {settingsTabs.map((tab) => (
+                <TabsTrigger
+                  key={tab.value}
+                  value={tab.value}
+                  className="rounded-lg px-3 hover:bg-sky/50 data-active:bg-primary data-active:text-primary-foreground data-active:shadow-sm data-active:hover:bg-primary"
+                >
+                  {tab.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
 
-          <TabsContent className="mt-6" value="profile">
-            <ProfileSettings
-              profile={settings.profile}
-              workspaceName={settings.workspace.name}
-              onSave={updateProfile}
-            />
-          </TabsContent>
+            <TabsContent className="mt-6" value="profile">
+              <Reveal>
+                <ProfileSettings
+                  profile={settings.profile}
+                  workspaceName={settings.workspace.name}
+                  onSave={updateProfile}
+                />
+              </Reveal>
+            </TabsContent>
 
-          <TabsContent className="mt-6" value="generation">
-            <GenerationSettings
-              preferences={settings.generationPreferences}
-              onSave={updateGenerationPreferences}
-            />
-          </TabsContent>
+            <TabsContent className="mt-6" value="generation">
+              <Reveal>
+                <GenerationSettings
+                  preferences={settings.generationPreferences}
+                  onSave={updateGenerationPreferences}
+                />
+              </Reveal>
+            </TabsContent>
 
-          <TabsContent className="mt-6" value="workspace">
-            <WorkspaceSettings
-              workspace={settings.workspace}
-              onSave={updateWorkspace}
-            />
-          </TabsContent>
+            <TabsContent className="mt-6" value="workspace">
+              <Reveal>
+                <WorkspaceSettings
+                  workspace={settings.workspace}
+                  onSave={updateWorkspace}
+                />
+              </Reveal>
+            </TabsContent>
 
-          <TabsContent className="mt-6" value="security">
-            <SecuritySettings
-              preferences={settings.securityPreferences}
-              onSave={updateSecurityPreferences}
-            />
-          </TabsContent>
+            <TabsContent className="mt-6" value="security">
+              <Reveal>
+                <SecuritySettings
+                  preferences={settings.securityPreferences}
+                  onSave={updateSecurityPreferences}
+                />
+              </Reveal>
+            </TabsContent>
 
-          <TabsContent className="mt-6" value="api-keys">
-            <ApiKeysSettings
-              apiKeys={apiKeys}
-              onCreateKey={createKey}
-              onRevokeKey={revokeKey}
-            />
-          </TabsContent>
+            <TabsContent className="mt-6" value="api-keys">
+              <Reveal>
+                <ApiKeysSettings
+                  apiKeys={apiKeys}
+                  onCreateKey={createKey}
+                  onRevokeKey={revokeKey}
+                />
+              </Reveal>
+            </TabsContent>
 
-          <TabsContent className="mt-6" value="billing">
-            <BillingSettings
-              balance={balance}
-              transactions={transactions}
-            />
-          </TabsContent>
-        </Tabs>
+            <TabsContent className="mt-6" value="billing">
+              <Reveal>
+                <BillingSettings
+                  balance={balance}
+                  transactions={transactions}
+                />
+              </Reveal>
+            </TabsContent>
+          </Tabs>
+        </RevealItem>
 
-        <DangerZone
-          onDeleteWorkspace={async () => {
-            await new Promise((resolve) => setTimeout(resolve, 500));
-          }}
-        />
-      </div>
+        <RevealItem>
+          <DangerZone
+            onDeleteWorkspace={async () => {
+              await new Promise((resolve) => setTimeout(resolve, 500));
+            }}
+          />
+        </RevealItem>
+      </RevealGroup>
     </AppShell>
   );
 }

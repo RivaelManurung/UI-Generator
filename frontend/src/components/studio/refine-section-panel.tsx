@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Wrench, AlertCircle } from "lucide-react";
+import { Wrench, Info } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -61,15 +61,27 @@ export function RefineSectionPanel({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-[420px] sm:max-w-[420px]">
         <SheetHeader>
-          <SheetTitle>Refine Layout Section</SheetTitle>
-          <SheetDescription className="text-xs">
-            Modify details in a specific panel without regenerating the entire page.
-          </SheetDescription>
+          <div className="flex items-start gap-3">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-planetary/15 bg-sky/40 text-planetary">
+              <Wrench className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <SheetTitle className="text-base font-semibold text-galaxy">
+                Refine Layout Section
+              </SheetTitle>
+              <SheetDescription className="mt-1 text-xs leading-5">
+                Modify details in a specific panel without regenerating the
+                entire page.
+              </SheetDescription>
+            </div>
+          </div>
         </SheetHeader>
 
         <form onSubmit={handleRefineSubmit} className="mt-5 grid gap-4">
           <div className="grid gap-2">
-            <Label htmlFor="refine-section-select">Select Section</Label>
+            <Label htmlFor="refine-section-select" className="text-xs font-medium text-galaxy">
+              Select Section
+            </Label>
             <Select value={selectedSection} onValueChange={setSelectedSection}>
               <SelectTrigger id="refine-section-select" aria-label="Select a page section to refine" className="text-xs">
                 <SelectValue placeholder="Choose a page section..." />
@@ -85,7 +97,9 @@ export function RefineSectionPanel({
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="refine-instruction">Refinement Instruction</Label>
+            <Label htmlFor="refine-instruction" className="text-xs font-medium text-galaxy">
+              Refinement Instruction
+            </Label>
             <Textarea
               id="refine-instruction"
               placeholder="e.g. Change table columns, use dynamic status colors, add filter presets..."
@@ -96,17 +110,17 @@ export function RefineSectionPanel({
             />
           </div>
 
-          <Alert className="bg-muted/40 border-border">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle className="font-semibold text-xs">Cost confirmation</AlertTitle>
-            <AlertDescription className="text-[10px] leading-4 font-medium text-muted-foreground mt-0.5">
-              Refinement costs <strong>{cost} credit</strong>. Your wallet has <strong>{creditsBalance} credits</strong>. This will compile a new layout version.
+          <Alert className="border-planetary/20 bg-sky/25 text-galaxy">
+            <Info className="h-4 w-4 text-planetary" />
+            <AlertTitle className="text-xs font-semibold text-galaxy">Cost confirmation</AlertTitle>
+            <AlertDescription className="mt-0.5 text-[11px] font-medium leading-4 text-muted-foreground">
+              Refinement costs <strong className="text-foreground">{cost} credit</strong>. Your wallet has <strong className="text-foreground">{creditsBalance} credits</strong>. This will compile a new layout version.
             </AlertDescription>
           </Alert>
 
           <Button
             type="submit"
-            className="w-full text-xs font-bold mt-2"
+            className="mt-2 w-full text-xs font-bold"
             disabled={!selectedSection || !instruction.trim() || creditsBalance < cost || refining}
           >
             {refining ? "Refining Section..." : `Apply Refinement (${cost} Credit)`}

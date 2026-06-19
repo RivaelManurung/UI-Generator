@@ -4,7 +4,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -54,59 +53,59 @@ export function GenerationConfirmDialog({
 
         <div className="grid gap-3 py-1">
           <div className="rounded-xl border border-border bg-muted/40 p-3">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Your prompt:</p>
-            <p className="mt-1 line-clamp-3 text-xs font-semibold text-foreground leading-5">{prompt}</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your prompt</p>
+            <p className="mt-1.5 line-clamp-3 text-sm font-medium leading-5 text-foreground">{prompt}</p>
           </div>
 
-          <div className="rounded-xl border border-border bg-muted/40 p-3 text-xs font-semibold">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Theme preset</span>
-              <span className="text-foreground">{themeName}</span>
+          <dl className="rounded-xl border border-border bg-card p-3 text-sm">
+            <div className="flex items-center justify-between gap-4">
+              <dt className="text-muted-foreground">Theme preset</dt>
+              <dd className="font-medium text-foreground">{themeName}</dd>
             </div>
 
-            <div className="mt-2 flex justify-between">
-              <span className="text-muted-foreground">Pages to generate</span>
-              <span className="text-foreground">{auto ? "Auto (AI decides)" : `${pageCount} page${pageCount > 1 ? "s" : ""}`}</span>
+            <div className="mt-2.5 flex items-center justify-between gap-4">
+              <dt className="text-muted-foreground">Pages to generate</dt>
+              <dd className="font-medium text-foreground">{auto ? "Auto (AI decides)" : `${pageCount} page${pageCount > 1 ? "s" : ""}`}</dd>
             </div>
 
-            <div className="mt-2 flex justify-between">
-              <span className="text-muted-foreground">Generation cost</span>
-              <span className="text-primary">{costLabel}</span>
+            <div className="mt-2.5 flex items-center justify-between gap-4 border-t border-border pt-2.5">
+              <dt className="text-muted-foreground">Generation cost</dt>
+              <dd className="font-semibold text-planetary">{costLabel}</dd>
             </div>
 
-            <div className="mt-2 flex justify-between">
-              <span className="text-muted-foreground">Wallet balance</span>
-              <span className="text-foreground">{creditsBalance} credit{creditsBalance > 1 ? "s" : ""}</span>
+            <div className="mt-2.5 flex items-center justify-between gap-4">
+              <dt className="text-muted-foreground">Wallet balance</dt>
+              <dd className="font-medium tabular-nums text-foreground">{creditsBalance} credit{creditsBalance > 1 ? "s" : ""}</dd>
             </div>
-          </div>
+          </dl>
 
-          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-muted/40 p-3">
+          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-sky/30 p-3 transition-colors hover:bg-sky/40">
             <input
               checked={boostPrompt}
-              className="mt-0.5 h-4 w-4 rounded border-border accent-primary cursor-pointer"
+              className="mt-0.5 h-4 w-4 cursor-pointer rounded border-border accent-primary"
               onChange={(event) => onBoostPromptChange(event.target.checked)}
               type="checkbox"
               id="prompt-boost-toggle"
             />
 
             <span>
-              <span className="block text-xs font-bold text-foreground">Prompt Boosting</span>
-              <span className="block text-[10px] text-muted-foreground mt-0.5 leading-4 font-medium">
+              <span className="block text-sm font-semibold text-foreground">Prompt Boosting</span>
+              <span className="mt-0.5 block text-xs font-medium leading-4 text-muted-foreground">
                 Analyze and improve layout brief definitions before running generation engines.
               </span>
             </span>
           </label>
 
-          <div className="rounded-xl border border-border bg-muted/40 p-3 text-[10px] font-semibold text-muted-foreground leading-4">
-            Important: Generation cannot be paused once started. Layout saves are committed to version history automatically.
-          </div>
+          <p className="px-1 text-xs font-medium leading-5 text-muted-foreground">
+            Generation cannot be paused once started. Layout saves are committed to version history automatically.
+          </p>
 
-          <div className="grid grid-cols-2 gap-2 pt-2">
+          <div className="grid grid-cols-2 gap-2 pt-1">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
 
-            <Button onClick={onConfirm} className="font-bold text-xs" disabled={notEnough}>
+            <Button onClick={onConfirm} disabled={notEnough}>
               {notEnough ? "Not enough credits" : "Generate"}
             </Button>
           </div>

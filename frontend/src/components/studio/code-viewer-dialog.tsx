@@ -22,6 +22,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Reveal } from "@/components/ui/reveal";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -84,12 +85,12 @@ export function CodeViewerDialog({
         <DialogHeader className="border-b border-border px-5 py-4 text-left">
           <div className="flex items-start justify-between gap-4">
             <div className="flex min-w-0 gap-3">
-              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-border bg-muted text-muted-foreground">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-planetary/15 bg-planetary/10 text-planetary">
                 <Code2 className="h-5 w-5" />
               </div>
 
               <div className="min-w-0">
-                <DialogTitle className="text-base font-semibold tracking-tight">
+                <DialogTitle className="text-base font-semibold tracking-normal">
                   Generated code
                 </DialogTitle>
                 <DialogDescription className="mt-1 text-sm leading-5">
@@ -299,7 +300,7 @@ function CodeEditorSkeleton() {
 function NoFilesState() {
   return (
     <div className="grid h-full min-h-[640px] place-items-center bg-background">
-      <div className="max-w-sm text-center">
+      <Reveal className="max-w-sm text-center">
         <div className="mx-auto grid h-12 w-12 place-items-center rounded-xl border border-border bg-muted text-muted-foreground">
           <FolderTree className="h-6 w-6" />
         </div>
@@ -312,7 +313,7 @@ function NoFilesState() {
           Generate a page first. Generated files will appear here for inspection
           and export.
         </p>
-      </div>
+      </Reveal>
     </div>
   );
 }

@@ -266,7 +266,7 @@ export function ScreensCanvas({ screens, activeKey, onSelect, onRefine }: Screen
       onPointerDown={startPan}
       role="application"
       aria-label="Screens canvas — drag to pan, scroll to zoom, drag a card to move it"
-      className="relative h-full w-full overflow-hidden bg-muted/30 select-none"
+      className="relative h-full w-full overflow-hidden bg-sky/30 select-none"
       style={{ cursor: isPanning ? "grabbing" : "grab", touchAction: "none" }}
     >
       {/* dotted grid backdrop */}
@@ -301,8 +301,8 @@ export function ScreensCanvas({ screens, activeKey, onSelect, onRefine }: Screen
               onPointerDown={(e) => startCardDrag(e, screen.key)}
             >
               <div
-                className={`flex items-center justify-between gap-2 rounded-t-xl border border-b-0 px-3 py-2 ${
-                  isActive ? "border-primary bg-primary/10" : "border-border bg-card"
+                className={`flex items-center justify-between gap-2 rounded-t-xl border border-b-0 px-3 py-2 transition-colors ${
+                  isActive ? "border-primary bg-sky/50" : "border-border bg-card hover:bg-muted/50"
                 }`}
                 style={{ height: HEADER_H, cursor: "grab" }}
               >
@@ -374,7 +374,7 @@ export function ScreensCanvas({ screens, activeKey, onSelect, onRefine }: Screen
                 style={{ width: d.cw, height: generating ? BODY_H : bodyH }}
               >
                 {generating ? (
-                  <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-muted/40">
+                  <div className="flex h-full w-full animate-in fade-in flex-col items-center justify-center gap-3 bg-sky/20">
                     <Loader2 className="h-6 w-6 animate-spin text-primary" />
                     <span className="text-xs font-semibold text-muted-foreground">Generating screen…</span>
                   </div>
@@ -403,7 +403,7 @@ export function ScreensCanvas({ screens, activeKey, onSelect, onRefine }: Screen
 
       {/* align toolbar (multi-select) */}
       {selected.size >= 2 && (
-        <div className="absolute left-1/2 top-4 z-10 flex -translate-x-1/2 items-center gap-1 rounded-xl border border-border bg-card px-2 py-1 text-xs font-semibold shadow-lg">
+        <div className="absolute left-1/2 top-4 z-10 flex -translate-x-1/2 items-center gap-1 rounded-xl border border-border bg-card px-2 py-1 text-xs font-semibold shadow-md shadow-galaxy/10">
           <span className="px-1 text-muted-foreground">{selected.size} selected</span>
           <button type="button" onClick={() => alignSelected("left")} className="rounded-md px-2 py-1 hover:bg-muted" aria-label="Align left">Align left</button>
           <button type="button" onClick={() => alignSelected("top")} className="rounded-md px-2 py-1 hover:bg-muted" aria-label="Align top">Align top</button>
@@ -439,7 +439,7 @@ export function ScreensCanvas({ screens, activeKey, onSelect, onRefine }: Screen
           const my = (y: number) => pad + (y - by0) * s;
           return (
             <div
-              className="absolute bottom-4 left-4 z-10 overflow-hidden rounded-lg border border-border bg-card/90 shadow-lg backdrop-blur"
+              className="absolute bottom-4 left-4 z-10 overflow-hidden rounded-lg border border-border bg-card/90 shadow-md shadow-galaxy/10 backdrop-blur"
               style={{ width: MW, height: MH }}
               aria-hidden="true"
             >
@@ -463,7 +463,7 @@ export function ScreensCanvas({ screens, activeKey, onSelect, onRefine }: Screen
         })()}
 
       {/* zoom controls */}
-      <div className="absolute bottom-4 right-4 z-10 flex items-center gap-1 rounded-xl border border-border bg-card p-1 shadow-lg">
+      <div className="absolute bottom-4 right-4 z-10 flex items-center gap-1 rounded-xl border border-border bg-card p-1 shadow-md shadow-galaxy/10">
         <button type="button" onClick={() => zoomBy(1 / 1.2)} className="grid h-8 w-8 place-items-center rounded-lg hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Zoom out">
           <Minus className="h-4 w-4" />
         </button>

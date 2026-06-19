@@ -41,7 +41,7 @@ export function PromptInputBox({
       <LabelForTextarea />
       <Textarea
         id="prompt-input"
-        className="min-h-[78px] max-h-[180px] resize-none overflow-y-auto text-xs rounded-xl border-border bg-background text-foreground shadow-sm placeholder:text-muted-foreground"
+        className="min-h-[78px] max-h-[180px] resize-none overflow-y-auto rounded-xl border-border bg-background text-xs text-foreground shadow-sm transition placeholder:text-muted-foreground focus-visible:border-primary/50"
         onChange={(event) => onChangePrompt(event.target.value)}
         placeholder="Describe what kind of webpage layout you want to generate. Minimum 40 characters..."
         value={prompt}
@@ -49,24 +49,24 @@ export function PromptInputBox({
       />
 
       <div className="mt-2 flex items-center justify-between text-[10px] font-semibold">
-        <span className={isLengthValid ? "text-foreground" : "text-muted-foreground"}>
+        <span className={isLengthValid ? "text-success-foreground" : "text-muted-foreground"}>
           {isLengthValid ? "Good description length" : "Min 40 characters required"}
         </span>
 
-        <span className={isLengthValid ? "text-foreground font-mono" : "text-muted-foreground font-mono"}>
+        <span className={`font-mono tabular-nums ${isLengthValid ? "text-success-foreground" : "text-muted-foreground"}`}>
           {promptLength}/40
         </span>
       </div>
 
       <button
-        className="mt-3 flex w-full items-center justify-between rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs font-semibold transition hover:bg-muted"
+        className="mt-3 flex w-full items-center justify-between rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs font-semibold transition hover:border-primary/30 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
         onClick={onOpenThemePicker}
         type="button"
         aria-label="Open theme customization sheet"
         disabled={isGenerating}
       >
-        <span className="text-foreground">Theme: {selectedThemeName}</span>
-        <span className="font-bold text-primary">1 credit / page</span>
+        <span className="min-w-0 truncate text-foreground">Theme: {selectedThemeName}</span>
+        <span className="shrink-0 font-bold text-primary">1 credit / page</span>
       </button>
 
       <div className="mt-3 flex items-center justify-between gap-2">
@@ -108,7 +108,8 @@ export function PromptInputBox({
       </div>
 
       <Button
-        className="mt-3 w-full font-bold text-xs"
+        className="mt-3 w-full text-xs font-bold"
+        size="lg"
         disabled={!canGenerate}
         type="submit"
         aria-label="Submit generation prompt"

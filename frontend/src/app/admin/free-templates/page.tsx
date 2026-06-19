@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { ExternalLink, Loader2, Plus, Trash2 } from "lucide-react";
+import { ExternalLink, FileStack, Loader2, Plus, Trash2 } from "lucide-react";
 
 import { AdminShell } from "@/components/layout/admin-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Reveal } from "@/components/ui/reveal";
+import { SectionCard } from "@/components/ui/section-card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -88,38 +89,56 @@ export default function AdminFreeTemplatesPage() {
         </Button>
       }
     >
-      <Card>
-        <CardContent className="p-0">
+      <Reveal>
+        <SectionCard className="overflow-hidden">
           {loading ? (
-            <div className="flex justify-center py-16">
-              <Loader2 className="size-6 animate-spin text-muted-foreground" aria-label="Loading" />
+            <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+              <Loader2 className="size-6 animate-spin text-planetary" aria-label="Loading" />
+              <p className="text-sm text-muted-foreground">Loading free templates…</p>
             </div>
           ) : items.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 py-16 text-center">
-              <p className="text-sm font-medium text-foreground">No free templates yet</p>
-              <p className="text-sm text-muted-foreground">
-                Publish a generated page to make it available for free download.
-              </p>
+            <div className="flex flex-col items-center gap-3 py-16 text-center">
+              <span className="flex size-12 items-center justify-center rounded-2xl bg-sky/60 text-planetary">
+                <FileStack className="size-6" aria-hidden />
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-foreground">No free templates yet</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Publish a generated page to make it available for free download.
+                </p>
+              </div>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Page type</TableHead>
-                    <TableHead className="text-right">Downloads</TableHead>
-                    <TableHead>Published</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                  <TableRow className="bg-muted/50 hover:bg-muted/50">
+                    <TableHead className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
+                      Title
+                    </TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
+                      Category
+                    </TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
+                      Page type
+                    </TableHead>
+                    <TableHead className="text-right text-xs font-semibold uppercase tracking-normal text-muted-foreground">
+                      Downloads
+                    </TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
+                      Published
+                    </TableHead>
+                    <TableHead className="text-right text-xs font-semibold uppercase tracking-normal text-muted-foreground">
+                      Actions
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {items.map((t) => (
-                    <TableRow key={t.id}>
+                    <TableRow key={t.id} className="group hover:bg-sky/30">
                       <TableCell>
                         <div className="font-semibold text-foreground">{t.title}</div>
-                        <div className="text-xs text-muted-foreground">/{t.slug}</div>
+                        <div className="text-xs text-muted-foreground tabular-nums">/{t.slug}</div>
                       </TableCell>
                       <TableCell>
                         <Badge variant="secondary" className="capitalize">
@@ -127,22 +146,37 @@ export default function AdminFreeTemplatesPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="capitalize text-muted-foreground">{t.pageType}</TableCell>
-                      <TableCell className="text-right tabular-nums">{t.downloads}</TableCell>
+                      <TableCell className="text-right tabular-nums text-foreground">
+                        {t.downloads}
+                      </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2.5">
                           <Switch
                             checked={t.published}
                             onCheckedChange={() => togglePublished(t)}
                             aria-label={`Toggle publish for ${t.title}`}
                           />
-                          <span className="text-xs text-muted-foreground">
-                            {t.published ? "Public" : "Hidden"}
-                          </span>
+                          {t.published ? (
+                            <Badge className="border-transparent bg-success-bg text-success-foreground">
+                              <span className="mr-1 size-1.5 rounded-full bg-success" aria-hidden />
+                              Public
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-muted-foreground">
+                              Hidden
+                            </Badge>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <Button asChild size="icon" variant="ghost" aria-label="Open public page">
+                          <Button
+                            asChild
+                            size="icon"
+                            variant="ghost"
+                            aria-label="Open public page"
+                            className="text-muted-foreground group-hover:text-planetary"
+                          >
                             <a href="/templates" target="_blank" rel="noreferrer">
                               <ExternalLink className="h-4 w-4" />
                             </a>
@@ -152,8 +186,9 @@ export default function AdminFreeTemplatesPage() {
                             variant="ghost"
                             onClick={() => remove(t)}
                             aria-label={`Delete ${t.title}`}
+                            className="text-muted-foreground hover:text-destructive group-hover:text-destructive"
                           >
-                            <Trash2 className="h-4 w-4 text-destructive" />
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </TableCell>
@@ -163,8 +198,8 @@ export default function AdminFreeTemplatesPage() {
               </Table>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </SectionCard>
+      </Reveal>
 
       <PublishDialog
         open={publishOpen}

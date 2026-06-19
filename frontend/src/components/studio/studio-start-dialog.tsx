@@ -48,9 +48,9 @@ export function StudioStartDialog({
           <button
             type="button"
             onClick={onCreate}
-            className="flex w-full items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 p-3 text-left transition hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="group flex w-full items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 p-3 text-left transition hover:border-primary/50 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground">
+            <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground transition-transform group-hover:scale-105">
               <Plus className="size-4" />
             </span>
             <span className="min-w-0">
@@ -79,10 +79,20 @@ export function StudioStartDialog({
                     key={project.id}
                     type="button"
                     onClick={() => onOpen(project.id)}
-                    className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-3 text-left transition hover:border-primary/40 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className={`group flex items-center justify-between gap-3 rounded-xl border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                      isCurrent
+                        ? "border-primary/40 bg-primary/5"
+                        : "border-border bg-card hover:border-primary/40 hover:bg-muted/40"
+                    }`}
                   >
                     <span className="flex min-w-0 items-center gap-3">
-                      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
+                      <span
+                        className={`grid size-9 shrink-0 place-items-center rounded-lg transition-colors ${
+                          isCurrent
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
+                        }`}
+                      >
                         <FolderOpen className="size-4" />
                       </span>
                       <span className="min-w-0">

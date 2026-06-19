@@ -437,9 +437,9 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
         <aside className={`relative z-30 flex h-[calc(100svh-3.5rem)] flex-col border-r border-border bg-card transition-all duration-300 ${isChatOpen ? "w-[284px]" : "w-[52px]"}`}>
           <div className="flex h-14 items-center justify-between border-b border-border px-3">
             {isChatOpen && (
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs font-bold text-foreground">Studio Engine</p>
-                <p className="text-[10px] text-muted-foreground font-medium">Describe your layout requirements</p>
+                <p className="truncate text-[10px] font-medium text-muted-foreground">Describe your layout requirements</p>
               </div>
             )}
             <Button
@@ -565,7 +565,7 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
 
           {/* Full-area preview of the selected generated screen (device-framed,
               fit-to-width). Switch screens via the tab strip inside ScreenPreview. */}
-          <div className="relative flex-1 overflow-hidden">
+          <div className="relative flex-1 overflow-hidden bg-sky/30">
             {screenCards.length > 0 ? (
               <ScreenPreview
                 screens={screenCards}

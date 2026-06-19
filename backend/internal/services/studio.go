@@ -900,6 +900,10 @@ func (s *StudioService) reloadResult(ctx context.Context, userID string, jobID s
 // provider so a page is never left empty when the live AI provider fails
 // validation. The credit was already refunded when the job first failed.
 func (s *StudioService) ReprocessWithMock(ctx context.Context, userID, jobID string) {
+	// Make the fallback LOUD: a generic "Operations Dashboard"-style page means
+	// the live AI provider failed (bad key, timeout, malformed JSON) — not that
+	// the app is "still on mock". Surface it so it can be diagnosed from logs.
+	logger.New().Error("AI generation fell back to the deterministic mock template — output will look generic. Check AI_PROVIDER, the provider key, and provider logs.", map[string]interface{}{"jobId": jobID, "userId": userID})
 	if err := s.jobs.UpdateStatus(ctx, jobID, "queued", ""); err != nil {
 		return
 	}

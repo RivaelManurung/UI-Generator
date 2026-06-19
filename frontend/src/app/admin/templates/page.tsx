@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { MoreHorizontal, Plus } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Crown, LayoutTemplate, Loader2, MoreHorizontal, Plus, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 import { AdminShell } from "@/components/layout/admin-shell";
@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Reveal } from "@/components/ui/reveal";
 import { Separator } from "@/components/ui/separator";
 import {
   Dialog,
@@ -137,6 +138,11 @@ export default function AdminTemplatesPage() {
 
   const filtered = templates;
   const total = filtered.length;
+  const premiumCount = useMemo(
+    () => templates.filter((template) => template.tier === "Premium").length,
+    [templates],
+  );
+  const freeCount = total - premiumCount;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const start = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
@@ -258,6 +264,31 @@ export default function AdminTemplatesPage() {
         </Button>
       }
     >
+      <div className="space-y-6">
+      <Reveal>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <SummaryCard
+            icon={LayoutTemplate}
+            label="Total templates"
+            value={total}
+            hint="In the catalog"
+          />
+          <SummaryCard
+            icon={Crown}
+            label="Premium"
+            value={premiumCount}
+            hint="Paid-tier templates"
+          />
+          <SummaryCard
+            icon={Sparkles}
+            label="Free"
+            value={freeCount}
+            hint="Open to every workspace"
+          />
+        </div>
+      </Reveal>
+
+      <Reveal delay={0.05}>
       <Card>
         <CardContent className="p-0">
           {selectedIds.size > 0 ? (
@@ -276,7 +307,7 @@ export default function AdminTemplatesPage() {
           ) : null}
           <Table>
             <TableHeader>
-              <TableRow>
+              <TableRow className="bg-muted/50 hover:bg-muted/50">
                 <TableHead className="w-10">
                   <Checkbox
                     aria-label="Select all"
@@ -294,7 +325,7 @@ export default function AdminTemplatesPage() {
             </TableHeader>
             <TableBody>
               {loading ? (
-                Array.from({ length: 4 }).map((_, index) => (
+                Array.from({ length: 5 }).map((_, index) => (
                   <TableRow key={`skeleton-${index}`}>
                     <TableCell colSpan={7}>
                       <Skeleton className="h-6 w-full" />
@@ -303,13 +334,29 @@ export default function AdminTemplatesPage() {
                 ))
               ) : templates.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-16 text-center text-muted-foreground">
-                    No templates yet. Create your first one.
+                  <TableCell colSpan={7} className="py-16">
+                    <div className="flex flex-col items-center justify-center gap-3 text-center">
+                      <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sky/60 text-planetary">
+                        <LayoutTemplate className="size-6" />
+                      </span>
+                      <div className="space-y-1">
+                        <p className="text-sm font-bold tracking-normal text-foreground">
+                          No templates yet
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Create your first template to seed new projects.
+                        </p>
+                      </div>
+                      <Button size="sm" onClick={openCreate}>
+                        <Plus className="size-4" />
+                        New template
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : (
                 paged.map((template) => (
-                  <TableRow key={template.id}>
+                  <TableRow key={template.id} className="group hover:bg-sky/30">
                     <TableCell>
                       <Checkbox
                         aria-label="Select row"
@@ -318,29 +365,48 @@ export default function AdminTemplatesPage() {
                       />
                     </TableCell>
                     <TableCell className="font-semibold tracking-normal">
-                      {template.name}
+                      <span className="transition-colors group-hover:text-planetary">
+                        {template.name}
+                      </span>
                       <span className="block font-mono text-xs text-muted-foreground">
                         {template.id}
                       </span>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{template.domain}</Badge>
+                      <Badge
+                        variant="outline"
+                        className="bg-muted/50 capitalize text-foreground"
+                      >
+                        {template.domain}
+                      </Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="secondary">{template.pageType}</Badge>
+                      <Badge variant="secondary" className="capitalize">
+                        {template.pageType}
+                      </Badge>
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {template.componentHint}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={template.tier === "Premium" ? "default" : "outline"}>
-                        {template.tier}
-                      </Badge>
+                      {template.tier === "Premium" ? (
+                        <Badge className="gap-1 bg-warning-bg text-warning-foreground">
+                          <Crown className="size-3" />
+                          Premium
+                        </Badge>
+                      ) : (
+                        <Badge className="bg-success-bg text-success-foreground">Free</Badge>
+                      )}
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" aria-label="Template actions">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Template actions"
+                            className="group-hover:text-planetary"
+                          >
                             <MoreHorizontal className="size-4" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -393,6 +459,8 @@ export default function AdminTemplatesPage() {
           ) : null}
         </CardContent>
       </Card>
+      </Reveal>
+      </div>
 
       <Dialog open={bulkOpen} onOpenChange={(open) => (!open ? setBulkOpen(false) : null)}>
         <DialogContent className="sm:max-w-md">
@@ -411,6 +479,7 @@ export default function AdminTemplatesPage() {
               onClick={() => void handleBulkDelete()}
               disabled={bulkBusy}
             >
+              {bulkBusy ? <Loader2 className="size-4 animate-spin" /> : null}
               {bulkBusy ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>
@@ -533,6 +602,7 @@ export default function AdminTemplatesPage() {
               Cancel
             </Button>
             <Button onClick={handleSubmit} disabled={saving}>
+              {saving ? <Loader2 className="size-4 animate-spin" /> : null}
               {saving ? "Saving..." : editing ? "Save changes" : "Create template"}
             </Button>
           </DialogFooter>
@@ -554,11 +624,43 @@ export default function AdminTemplatesPage() {
               Cancel
             </Button>
             <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+              {deleting ? <Loader2 className="size-4 animate-spin" /> : null}
               {deleting ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </AdminShell>
+  );
+}
+
+function SummaryCard({
+  icon: Icon,
+  label,
+  value,
+  hint,
+}: {
+  icon: typeof LayoutTemplate;
+  label: string;
+  value: number;
+  hint: string;
+}) {
+  return (
+    <Card className="group transition hover:-translate-y-0.5 hover:border-planetary/30 hover:shadow-brand-sm">
+      <CardContent className="flex items-start gap-3.5 pt-6">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky/60 text-planetary transition-colors group-hover:bg-planetary group-hover:text-white">
+          <Icon className="size-5" />
+        </span>
+        <div className="min-w-0 space-y-0.5">
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            {label}
+          </p>
+          <p className="text-2xl font-bold tabular-nums tracking-normal text-galaxy">
+            {value}
+          </p>
+          <p className="text-xs text-muted-foreground">{hint}</p>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

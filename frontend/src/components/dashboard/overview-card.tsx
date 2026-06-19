@@ -4,6 +4,7 @@ import type { ComponentType } from "react";
 
 import { SectionCard } from "@/components/ui/section-card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { RevealGroup, RevealItem } from "@/components/ui/reveal";
 
 export interface OverviewStat {
   label: string;
@@ -30,27 +31,29 @@ export function OverviewCards({
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <RevealGroup className="grid gap-4 md:grid-cols-2 xl:grid-cols-4" stagger={0.05}>
       {stats.map((stat) => (
-        <SectionCard className="h-full" key={stat.label}>
-          <div className="p-5">
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-muted-foreground">{stat.label}</p>
-                <p className="mt-2 text-3xl font-bold tabular-nums tracking-normal text-foreground">
-                  {stat.value}
-                </p>
+        <RevealItem className="h-full" key={stat.label}>
+          <SectionCard className="group h-full transition-transform duration-200 hover:-translate-y-0.5">
+            <div className="p-5">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-muted-foreground">{stat.label}</p>
+                  <p className="mt-2 text-3xl font-bold tabular-nums tracking-normal text-foreground">
+                    {stat.value}
+                  </p>
+                </div>
+                <span className="flex size-10 items-center justify-center rounded-xl bg-sky/60 text-planetary transition-colors group-hover:bg-planetary group-hover:text-white">
+                  <stat.icon className="size-4" />
+                </span>
               </div>
-              <span className="flex size-10 items-center justify-center rounded-xl border border-border bg-muted text-foreground">
-                <stat.icon className="size-4" />
-              </span>
+              {stat.detail ? (
+                <p className="mt-4 truncate text-xs font-medium text-muted-foreground">{stat.detail}</p>
+              ) : null}
             </div>
-            {stat.detail ? (
-              <p className="mt-4 truncate text-xs font-medium text-muted-foreground">{stat.detail}</p>
-            ) : null}
-          </div>
-        </SectionCard>
+          </SectionCard>
+        </RevealItem>
       ))}
-    </div>
+    </RevealGroup>
   );
 }

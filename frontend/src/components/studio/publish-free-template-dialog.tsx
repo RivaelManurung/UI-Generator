@@ -105,7 +105,7 @@ export function PublishFreeTemplateDialog({
               Cancel
             </Button>
             <Button onClick={submit} disabled={submitting || !title.trim() || !pageId}>
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Publish
             </Button>
           </div>

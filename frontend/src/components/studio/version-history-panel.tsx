@@ -38,12 +38,12 @@ export function VersionHistoryPanel({
       <SheetContent className="flex w-full flex-col border-border p-0 sm:max-w-[440px]">
         <SheetHeader className="border-b border-border px-5 py-4 text-left">
           <div className="flex items-start gap-3">
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-border bg-muted text-muted-foreground">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-planetary/15 bg-sky/40 text-planetary">
               <History className="h-5 w-5" />
             </div>
 
             <div className="min-w-0">
-              <SheetTitle className="text-base font-semibold tracking-tight">
+              <SheetTitle className="text-base font-semibold text-galaxy">
                 Version history
               </SheetTitle>
               <SheetDescription className="mt-1 text-sm leading-5">
@@ -54,7 +54,7 @@ export function VersionHistoryPanel({
           </div>
         </SheetHeader>
 
-        <div className="border-b border-border bg-muted/30 px-5 py-3">
+        <div className="border-b border-border bg-sky/20 px-5 py-3">
           <div className="grid grid-cols-3 gap-2 text-center">
             <SummaryItem label="Versions" value={versions.length} />
             <SummaryItem
@@ -87,15 +87,15 @@ export function VersionHistoryPanel({
                     className={cn(
                       "relative rounded-xl border bg-card p-4 shadow-sm transition-colors",
                       isActive
-                        ? "border-primary/40 bg-primary/5"
-                        : "border-border hover:bg-muted/35",
+                        ? "border-planetary bg-sky/30"
+                        : "border-border hover:border-planetary/30 hover:bg-sky/20",
                     )}
                   >
                     <div
                       className={cn(
-                        "absolute -left-[2px] top-5 z-10 grid h-10 w-10 place-items-center rounded-full border bg-background",
+                        "absolute -left-[2px] top-5 z-10 grid h-10 w-10 place-items-center rounded-full border bg-background transition-colors",
                         isActive
-                          ? "border-primary text-primary"
+                          ? "border-planetary bg-primary text-primary-foreground"
                           : "border-border text-muted-foreground",
                       )}
                     >
@@ -110,12 +110,12 @@ export function VersionHistoryPanel({
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-sm font-semibold tracking-tight">
+                            <h3 className="text-sm font-semibold text-galaxy">
                               Version {version.versionNumber}
                             </h3>
 
                             {isActive ? (
-                              <Badge variant="secondary" className="h-5">
+                              <Badge className="h-5 border-transparent bg-primary text-primary-foreground">
                                 Active
                               </Badge>
                             ) : null}
@@ -128,7 +128,7 @@ export function VersionHistoryPanel({
 
                         <Badge
                           variant="outline"
-                          className="shrink-0 font-mono text-xs"
+                          className="shrink-0 border-planetary/20 font-mono text-xs text-planetary"
                         >
                           {version.qualityScore}%
                         </Badge>
@@ -148,7 +148,7 @@ export function VersionHistoryPanel({
 
                         <Button
                           size="sm"
-                          variant={isActive ? "secondary" : "outline"}
+                          variant={isActive ? "secondary" : "default"}
                           disabled={isActive}
                           onClick={() => {
                             onRestore(version.id);
@@ -191,22 +191,24 @@ function SummaryItem({
   value: string | number;
 }) {
   return (
-    <div className="rounded-lg border border-border bg-background px-3 py-2">
+    <div className="rounded-lg border border-border bg-card px-3 py-2">
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="mt-1 text-sm font-semibold text-foreground">{value}</p>
+      <p className="mt-1 text-sm font-semibold tabular-nums text-galaxy">
+        {value}
+      </p>
     </div>
   );
 }
 
 function EmptyVersionState() {
   return (
-    <div className="grid min-h-[360px] place-items-center rounded-xl border border-dashed border-border bg-muted/25 p-6 text-center">
+    <div className="grid min-h-[360px] place-items-center rounded-xl border border-dashed border-planetary/20 bg-sky/15 p-6 text-center">
       <div className="max-w-[280px]">
-        <div className="mx-auto grid h-12 w-12 place-items-center rounded-xl border border-border bg-background text-muted-foreground">
+        <div className="mx-auto grid h-12 w-12 place-items-center rounded-xl border border-planetary/15 bg-sky/40 text-planetary">
           <History className="h-6 w-6" />
         </div>
 
-        <h3 className="mt-4 text-sm font-semibold text-foreground">
+        <h3 className="mt-4 text-sm font-semibold text-galaxy">
           No versions yet
         </h3>
 

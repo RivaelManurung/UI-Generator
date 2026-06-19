@@ -71,22 +71,28 @@ export function ThemePickerSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full border-t border-border sm:max-w-none sm:rounded-t-2xl sm:border-l-0" side="bottom">
         <SheetHeader>
-          <SheetTitle>Choose Design System</SheetTitle>
-          <SheetDescription className="text-xs">
+          <SheetTitle className="text-base font-semibold text-galaxy">Choose Design System</SheetTitle>
+          <SheetDescription className="text-xs leading-5">
             Pick the visual style for the generated project. It changes both the live preview and the exported code.
           </SheetDescription>
         </SheetHeader>
 
-        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 overflow-y-auto max-h-[40vh] pb-4 pr-1">
+        <div className="mt-5 grid max-h-[40vh] grid-cols-2 gap-3 overflow-y-auto pb-4 pr-1 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7">
           {systems.map((ds) => {
             const isActive = selectedThemeSlug === ds.slug;
             const isDisabled = ds.status === "soon";
 
             return (
               <button
-                className={`relative rounded-xl border bg-card p-3 text-left text-card-foreground transition w-full ${
-                  isActive ? "border-primary ring-2 ring-ring" : "border-border"
-                } ${isDisabled ? "opacity-50 cursor-not-allowed" : "hover:bg-muted/50"}`}
+                className={`relative w-full rounded-xl border bg-card p-3 text-left text-card-foreground transition-colors ${
+                  isActive
+                    ? "border-planetary ring-2 ring-planetary/40 ring-offset-2 ring-offset-background"
+                    : "border-border"
+                } ${
+                  isDisabled
+                    ? "cursor-not-allowed opacity-50"
+                    : "hover:border-planetary/30 hover:bg-sky/20"
+                }`}
                 disabled={isDisabled}
                 key={ds.slug}
                 onClick={() => {
@@ -100,10 +106,10 @@ export function ThemePickerSheet({
                 title={ds.description}
               >
                 <Thumbnail ds={ds} />
-                <p className="mt-2 text-xs font-bold">{ds.name}</p>
+                <p className="mt-2 truncate text-xs font-bold text-galaxy">{ds.name}</p>
 
                 {isActive && (
-                  <Badge variant="secondary" className="absolute top-2 right-2 text-[8px] h-4 px-1 border-0">
+                  <Badge className="absolute right-2 top-2 h-4 border-transparent bg-primary px-1 text-[8px] text-primary-foreground">
                     Active
                   </Badge>
                 )}

@@ -65,7 +65,7 @@ export function RecentProjects({
               <li key={project.id}>
                 <Link
                   href={`/app/studio/${project.id}`}
-                  className="grid grid-cols-[1fr_auto] items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 transition-colors hover:bg-muted/40"
+                  className="group grid grid-cols-[1fr_auto] items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 transition hover:-translate-y-0.5 hover:border-planetary/30 hover:shadow-brand-sm"
                 >
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
@@ -84,7 +84,7 @@ export function RecentProjects({
                       Updated {formatDate(project.updatedAt)}
                     </p>
                   </div>
-                  <ArrowUpRight className="size-4 shrink-0 text-muted-foreground" />
+                  <ArrowUpRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-planetary" />
                 </Link>
               </li>
             ))}

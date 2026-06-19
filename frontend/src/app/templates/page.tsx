@@ -8,6 +8,7 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Reveal, RevealGroup, RevealItem } from "@/components/ui/reveal";
 import { FreeTemplateCard } from "@/components/freebies/free-template-card";
 import { FreeTemplatePreviewDialog } from "@/components/freebies/free-template-preview-dialog";
 import { useDesignSystems } from "@/hooks/use-design-systems";
@@ -61,33 +62,29 @@ export default function PublicTemplatesPage() {
   }, [templates, activeCategory, query]);
 
   return (
-    <main className="min-h-screen bg-background">
+    <main className="landing-shell min-h-screen selection:bg-planetary selection:text-white">
       <SiteHeader />
 
-      {/* Hero */}
-      <section className="relative overflow-hidden border-b border-border">
-        <div className="grid-bg pointer-events-none absolute inset-x-0 top-0 h-80" />
-        <div className="glow pointer-events-none absolute inset-x-0 top-0 h-80" />
-        <div className="relative mx-auto max-w-7xl px-5 py-16 text-center sm:py-20">
-          <Badge className="gap-2" variant="secondary">
-            <Code2 className="size-3.5 text-primary" />
+      <section className="landing-hero">
+        <Reveal className="mx-auto max-w-3xl px-4 py-16 text-center sm:px-6 sm:py-20">
+          <span className="landing-pill inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-medium tracking-normal">
+            <Code2 className="size-3.5 text-planetary" aria-hidden="true" />
             Free Templates
-          </Badge>
-          <h1 className="text-balance mx-auto mt-6 max-w-3xl text-4xl font-extrabold leading-[1.1] tracking-normal sm:text-5xl">
-            Download free <span className="text-primary">UI templates</span>.
+          </span>
+          <h1 className="mt-6 text-balance text-4xl font-bold leading-[1.08] tracking-normal sm:text-5xl">
+            Download free <span className="text-planetary">UI templates</span>.
           </h1>
-          <p className="text-balance mx-auto mt-5 max-w-2xl text-lg text-muted-foreground">
-            Browse our collection of generated templates — responsive layouts you can preview, then copy the
-            HTML or TSX and use in your projects for free.
+          <p className="landing-text-soft mx-auto mt-5 max-w-2xl text-base leading-7 sm:text-lg">
+            Generated templates you can preview, then copy the HTML or TSX and drop straight into your projects
+            — for free.
           </p>
-        </div>
+        </Reveal>
       </section>
 
-      {/* Filters + grid */}
-      <section className="mx-auto max-w-7xl px-5 py-12">
+      <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="relative w-full lg:max-w-sm">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
             <Input
               aria-label="Search templates"
               className="pl-9"
@@ -102,7 +99,7 @@ export default function PublicTemplatesPage() {
               return (
                 <Badge asChild key={category} variant={active ? "default" : "outline"}>
                   <button
-                    className="h-8 cursor-pointer px-3 capitalize transition-colors hover:border-primary/40"
+                    className="h-8 cursor-pointer px-3 capitalize transition-colors hover:border-planetary/40"
                     onClick={() => setActiveCategory(category)}
                     type="button"
                   >
@@ -116,66 +113,59 @@ export default function PublicTemplatesPage() {
 
         {loading ? (
           <div className="flex justify-center py-24">
-            <Loader2 className="size-6 animate-spin text-primary" aria-label="Loading templates" />
+            <Loader2 className="size-6 animate-spin text-planetary" aria-label="Loading templates" />
           </div>
         ) : (
           <>
-            <p className="mt-6 text-sm text-muted-foreground">
+            <p className="landing-text-muted mt-6 text-sm">
               {filtered.length} {filtered.length === 1 ? "template" : "templates"} available
               {activeCategory !== "All" ? ` in ${activeCategory}` : ""}.
             </p>
 
             {filtered.length === 0 ? (
-              <div className="mt-10 rounded-xl border border-dashed border-border bg-muted/30 px-6 py-16 text-center">
+              <div className="landing-card mt-10 rounded-2xl border-dashed px-6 py-16 text-center">
                 <p className="text-base font-semibold">No templates yet</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Published free templates will appear here.
-                </p>
+                <p className="landing-text-muted mt-1 text-sm">Published free templates will appear here.</p>
               </div>
             ) : (
-              <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              <RevealGroup className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3" stagger={0.06}>
                 {filtered.map((template) => (
-                  <FreeTemplateCard
-                    key={template.slug}
-                    template={template}
-                    designSystems={designSystems}
-                    onOpen={setOpenSlug}
-                  />
+                  <RevealItem key={template.slug} className="h-full">
+                    <FreeTemplateCard template={template} designSystems={designSystems} onOpen={setOpenSlug} />
+                  </RevealItem>
                 ))}
-              </div>
+              </RevealGroup>
             )}
           </>
         )}
       </section>
 
-      {/* Footer CTA band */}
-      <section className="border-t border-border bg-muted/30">
-        <div className="mx-auto max-w-7xl px-5 py-16">
-          <div className="relative overflow-hidden rounded-2xl border border-border bg-card px-6 py-12 text-center shadow-sm sm:px-12">
-            <div className="glow pointer-events-none absolute inset-x-0 top-0 h-40" />
-            <div className="relative">
-              <Layers3 className="mx-auto size-8 text-primary" />
-              <h2 className="text-balance mx-auto mt-4 max-w-2xl text-3xl font-bold tracking-normal">
-                Want a template tailored to your data?
-              </h2>
-              <p className="text-balance mx-auto mt-3 max-w-xl text-muted-foreground">
-                Describe your domain and DashboardCraft will generate a validated, schema-first dashboard
-                you can preview and export.
-              </p>
-              <div className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                <Button asChild size="lg">
-                  <Link href="/register">
-                    Start building free
-                    <ArrowRight className="size-4" />
-                  </Link>
-                </Button>
-                <Button asChild size="lg" variant="ghost">
-                  <Link href="/login">I already have an account</Link>
-                </Button>
-              </div>
-            </div>
+      <section className="px-4 pb-24 pt-4 sm:px-6">
+        <Reveal className="landing-cta mx-auto max-w-7xl rounded-3xl px-6 py-12 text-center text-white sm:px-12">
+          <Layers3 className="mx-auto size-8" aria-hidden="true" />
+          <h2 className="mx-auto mt-4 max-w-2xl text-balance text-3xl font-bold tracking-normal">
+            Want a template tailored to your data?
+          </h2>
+          <p className="mx-auto mt-3 max-w-xl text-balance leading-7 text-white/90">
+            Describe your domain and DashboardCraft generates a validated, schema-first dashboard you can preview
+            and export.
+          </p>
+          <div className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <Link
+              href="/register"
+              className="group inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-meteor px-6 text-sm font-semibold text-galaxy transition hover:-translate-y-0.5 hover:brightness-95"
+            >
+              Start building free
+              <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+            </Link>
+            <Link
+              href="/login"
+              className="inline-flex h-12 items-center justify-center rounded-xl border border-white/20 px-6 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/10"
+            >
+              I already have an account
+            </Link>
           </div>
-        </div>
+        </Reveal>
       </section>
 
       <FreeTemplatePreviewDialog

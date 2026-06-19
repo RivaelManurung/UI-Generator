@@ -1,13 +1,29 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, MoreHorizontal } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  MoreHorizontal,
+  RefreshCw,
+  Search,
+  ShieldCheck,
+  Trash2,
+  UserCog,
+  Users,
+  UsersRound,
+  X,
+} from "lucide-react";
 
 import { AdminShell } from "@/components/layout/admin-shell";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Reveal, RevealGroup, RevealItem } from "@/components/ui/reveal";
+import { SectionCard } from "@/components/ui/section-card";
 import { Separator } from "@/components/ui/separator";
 import {
   Dialog,
@@ -67,18 +83,44 @@ function formatDate(value: string) {
 }
 
 function roleBadge(role: AdminUser["role"]) {
-  if (role === "user") return <Badge variant="outline">user</Badge>;
-  return <Badge variant="default">{role}</Badge>;
+  if (role === "user") {
+    return (
+      <Badge variant="outline" className="bg-muted/50 text-muted-foreground border-border">
+        user
+      </Badge>
+    );
+  }
+  return (
+    <Badge
+      variant="outline"
+      className="gap-1 border-planetary/20 bg-sky/60 text-planetary capitalize"
+    >
+      <ShieldCheck className="h-3 w-3" />
+      {role}
+    </Badge>
+  );
 }
 
 function statusBadge(status: Status) {
   if (status === "active") {
     return (
-      <Badge className="border-transparent bg-success-bg text-success-foreground">active</Badge>
+      <Badge variant="outline" className="border-success-border bg-success-bg text-success-foreground">
+        active
+      </Badge>
     );
   }
-  if (status === "review") return <Badge variant="secondary">review</Badge>;
-  return <Badge variant="destructive">suspended</Badge>;
+  if (status === "review") {
+    return (
+      <Badge variant="outline" className="border-warning-border bg-warning-bg text-warning-foreground">
+        review
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="outline" className="border-destructive/20 bg-destructive/10 text-destructive">
+      suspended
+    </Badge>
+  );
 }
 
 export default function AdminUsersPage() {
@@ -131,6 +173,19 @@ export default function AdminUsersPage() {
       return matchesTerm && matchesRole && matchesStatus;
     });
   }, [users, search, roleFilter, statusFilter]);
+
+  const summary = useMemo(() => {
+    return users.reduce(
+      (acc, user) => {
+        acc.total += 1;
+        if (user.role === "admin" || user.role === "owner") acc.admins += 1;
+        if (user.status === "active") acc.active += 1;
+        if (user.status === "suspended") acc.suspended += 1;
+        return acc;
+      },
+      { total: 0, admins: 0, active: 0, suspended: 0 },
+    );
+  }, [users]);
 
   const total = filtered.length;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -240,21 +295,66 @@ export default function AdminUsersPage() {
       subtitle="Manage accounts, roles, and credits."
       actions={
         <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
-          {loading ? <Loader2 className="animate-spin" /> : null}
+          {loading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <RefreshCw className="h-4 w-4" />
+          )}
           Refresh
         </Button>
       }
     >
-      <Card>
-        <CardContent className="space-y-4">
+      <RevealGroup
+        className="grid grid-cols-2 gap-4 lg:grid-cols-4"
+        stagger={0.05}
+      >
+        {[
+          { label: "Total accounts", value: summary.total, icon: Users },
+          { label: "Active", value: summary.active, icon: UsersRound },
+          { label: "Admins", value: summary.admins, icon: ShieldCheck },
+          { label: "Suspended", value: summary.suspended, icon: UserCog },
+        ].map((kpi) => (
+          <RevealItem key={kpi.label}>
+            <SectionCard className="group h-full transition hover:-translate-y-0.5 hover:border-planetary/30 hover:shadow-brand-sm">
+              <div className="flex items-center justify-between gap-3 px-5 pb-4 pt-5">
+                <div className="min-w-0">
+                  <p className="text-[0.65rem] font-semibold uppercase tracking-widest text-muted-foreground">
+                    {kpi.label}
+                  </p>
+                  <p className="mt-1.5 text-2xl font-bold tabular-nums tracking-normal text-galaxy">
+                    {loading ? "—" : kpi.value}
+                  </p>
+                </div>
+                <span
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky/60 text-planetary transition group-hover:bg-planetary group-hover:text-white"
+                  aria-hidden="true"
+                >
+                  <kpi.icon className="h-4 w-4" />
+                </span>
+              </div>
+            </SectionCard>
+          </RevealItem>
+        ))}
+      </RevealGroup>
+
+      <Reveal className="mt-6">
+      <SectionCard>
+        <CardContent className="space-y-4 pt-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <Input
-                placeholder="Search name or email"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                className="h-8 w-full sm:w-64"
-              />
+              <div className="relative w-full sm:w-64">
+                <Search
+                  className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                  aria-hidden="true"
+                />
+                <Input
+                  placeholder="Search name or email"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  className="h-8 w-full pl-8"
+                  aria-label="Search users by name or email"
+                />
+              </div>
               <Select
                 value={roleFilter}
                 onValueChange={(value) => setRoleFilter(value as "all" | Role)}
@@ -283,14 +383,15 @@ export default function AdminUsersPage() {
                 </SelectContent>
               </Select>
             </div>
-            <p className="text-sm text-muted-foreground">
-              {filtered.length} of {users.length} accounts
+            <p className="text-sm text-muted-foreground tabular-nums">
+              <span className="font-semibold text-foreground">{filtered.length}</span> of{" "}
+              {users.length} accounts
             </p>
           </div>
 
           {selectedIds.size > 0 ? (
-            <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/40 px-3 py-2">
-              <span className="text-sm font-medium tabular-nums">
+            <div className="flex flex-wrap items-center gap-3 rounded-xl border border-planetary/20 bg-sky/40 px-3 py-2">
+              <span className="text-sm font-semibold tabular-nums text-galaxy">
                 {selectedIds.size} selected
               </span>
               <Button
@@ -298,23 +399,25 @@ export default function AdminUsersPage() {
                 size="sm"
                 onClick={() => setSelectedIds(new Set())}
               >
+                <X className="h-4 w-4" />
                 Clear
               </Button>
-              <Separator orientation="vertical" className="h-5" />
+              <Separator orientation="vertical" className="h-5 bg-planetary/20" />
               <Button
                 variant="destructive"
                 size="sm"
                 onClick={() => setBulkOpen(true)}
               >
+                <Trash2 className="h-4 w-4" />
                 Delete selected
               </Button>
             </div>
           ) : null}
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto rounded-xl border border-border">
             <Table>
               <TableHeader>
-                <TableRow>
+                <TableRow className="bg-muted/50 hover:bg-muted/50">
                   <TableHead className="w-10">
                     <Checkbox
                       aria-label="Select all"
@@ -342,14 +445,27 @@ export default function AdminUsersPage() {
                     </TableRow>
                   ))
                 ) : filtered.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={9} className="text-center text-muted-foreground">
-                      No users yet
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={9} className="py-14">
+                      <div className="flex flex-col items-center justify-center gap-2 text-center">
+                        <span
+                          className="mb-1 flex h-11 w-11 items-center justify-center rounded-xl bg-sky/60 text-planetary"
+                          aria-hidden="true"
+                        >
+                          <Users className="h-5 w-5" />
+                        </span>
+                        <p className="text-sm font-medium text-foreground">No users found</p>
+                        <p className="text-sm text-muted-foreground">
+                          {users.length === 0
+                            ? "Accounts will appear here once people sign up."
+                            : "Try adjusting your search or filters."}
+                        </p>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ) : (
                   paged.map((user) => (
-                    <TableRow key={user.id}>
+                    <TableRow key={user.id} className="group transition-colors hover:bg-sky/30">
                       <TableCell>
                         <Checkbox
                           aria-label="Select row"
@@ -359,9 +475,11 @@ export default function AdminUsersPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-foreground">
-                            {initials(user.name)}
-                          </span>
+                          <Avatar className="size-8 shrink-0">
+                            <AvatarFallback className="bg-sky/60 text-xs font-semibold text-planetary transition-colors group-hover:bg-planetary group-hover:text-white">
+                              {initials(user.name)}
+                            </AvatarFallback>
+                          </Avatar>
                           <div className="min-w-0">
                             <p className="truncate font-medium text-foreground">{user.name}</p>
                             <p className="truncate text-xs text-muted-foreground">{user.email}</p>
@@ -370,27 +488,38 @@ export default function AdminUsersPage() {
                       </TableCell>
                       <TableCell>{roleBadge(user.role)}</TableCell>
                       <TableCell>{statusBadge(user.status)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{user.credits}</TableCell>
+                      <TableCell className="text-right font-semibold tabular-nums tracking-normal text-galaxy">
+                        {user.credits}
+                      </TableCell>
                       <TableCell className="text-right tabular-nums">{user.projects}</TableCell>
                       <TableCell className="text-right tabular-nums">
                         {user.pagesGenerated}
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
+                      <TableCell className="text-muted-foreground tabular-nums">
                         {formatDate(user.joinedAt)}
                       </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon-sm" aria-label="User actions">
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label={`Actions for ${user.name}`}
+                              className="text-muted-foreground transition-colors group-hover:text-planetary"
+                            >
                               <MoreHorizontal />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onSelect={() => openEdit(user)}>Edit</DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => openEdit(user)}>
+                              <UserCog className="h-4 w-4" />
+                              Edit
+                            </DropdownMenuItem>
                             <DropdownMenuItem
                               variant="destructive"
                               onSelect={() => setDeleting(user)}
                             >
+                              <Trash2 className="h-4 w-4" />
                               Delete
                             </DropdownMenuItem>
                           </DropdownMenuContent>
@@ -405,7 +534,7 @@ export default function AdminUsersPage() {
 
           {!loading && total > 0 ? (
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm text-muted-foreground tabular-nums">
+              <p className="text-xs text-muted-foreground tabular-nums">
                 Showing {start}–{end} of {total}
               </p>
               <div className="flex items-center gap-2">
@@ -414,10 +543,12 @@ export default function AdminUsersPage() {
                   size="sm"
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page <= 1}
+                  aria-label="Previous page"
                 >
+                  <ChevronLeft className="h-4 w-4" />
                   Prev
                 </Button>
-                <span className="text-sm text-muted-foreground tabular-nums">
+                <span className="px-1 text-xs font-medium text-muted-foreground tabular-nums">
                   Page {page} of {totalPages}
                 </span>
                 <Button
@@ -425,21 +556,25 @@ export default function AdminUsersPage() {
                   size="sm"
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   disabled={page >= totalPages}
+                  aria-label="Next page"
                 >
                   Next
+                  <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
             </div>
           ) : null}
         </CardContent>
-      </Card>
+      </SectionCard>
+      </Reveal>
 
       <Dialog open={bulkOpen} onOpenChange={(open) => (!open ? setBulkOpen(false) : null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete selected</DialogTitle>
+            <DialogTitle className="tracking-normal">Delete selected accounts</DialogTitle>
             <DialogDescription>
-              Delete {selectedIds.size} items? This cannot be undone.
+              Permanently delete {selectedIds.size}{" "}
+              {selectedIds.size === 1 ? "account" : "accounts"}? This cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -451,7 +586,11 @@ export default function AdminUsersPage() {
               onClick={() => void handleBulkDelete()}
               disabled={bulkBusy}
             >
-              {bulkBusy ? <Loader2 className="animate-spin" /> : null}
+              {bulkBusy ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
               Delete
             </Button>
           </DialogFooter>
@@ -461,7 +600,7 @@ export default function AdminUsersPage() {
       <Dialog open={editing !== null} onOpenChange={(open) => (!open ? setEditing(null) : null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit user</DialogTitle>
+            <DialogTitle className="tracking-normal">Edit user</DialogTitle>
             <DialogDescription>{editing?.email}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -505,7 +644,7 @@ export default function AdminUsersPage() {
               Cancel
             </Button>
             <Button onClick={() => void handleSave()} disabled={saving}>
-              {saving ? <Loader2 className="animate-spin" /> : null}
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               Save changes
             </Button>
           </DialogFooter>
@@ -515,7 +654,7 @@ export default function AdminUsersPage() {
       <Dialog open={deleting !== null} onOpenChange={(open) => (!open ? setDeleting(null) : null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete user</DialogTitle>
+            <DialogTitle className="tracking-normal">Delete user</DialogTitle>
             <DialogDescription>
               This permanently removes {deleting?.name}. This action cannot be undone.
             </DialogDescription>
@@ -525,7 +664,11 @@ export default function AdminUsersPage() {
               Cancel
             </Button>
             <Button variant="destructive" onClick={() => void handleDelete()} disabled={removing}>
-              {removing ? <Loader2 className="animate-spin" /> : null}
+              {removing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
               Delete
             </Button>
           </DialogFooter>

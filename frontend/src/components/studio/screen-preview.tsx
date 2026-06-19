@@ -151,7 +151,7 @@ export function ScreenPreview({
   }, [active?.html]);
 
   return (
-    <div className="flex h-full w-full flex-col bg-muted/20">
+    <div className="flex h-full w-full flex-col bg-sky/30">
       {/* Screen switcher + live generation progress */}
       <div className="flex min-h-11 items-center gap-2 overflow-x-auto border-b border-border bg-card/70 px-3 py-1.5">
         {generating ? (
@@ -282,7 +282,7 @@ export function ScreenPreview({
       {/* Full-area preview stage */}
       <div ref={stageRef} className="relative grid flex-1 place-items-center overflow-hidden p-4">
         {!active ? null : active.html === null ? (
-          <div className="flex flex-col items-center gap-3 text-muted-foreground">
+          <div className="flex animate-in fade-in flex-col items-center gap-3 text-muted-foreground">
             <Loader2 className="size-7 animate-spin text-primary" aria-hidden="true" />
             <span className="text-sm font-semibold">Generating this screen…</span>
           </div>

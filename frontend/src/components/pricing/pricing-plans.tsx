@@ -124,7 +124,7 @@ export function PricingPlans({
               <ul className="grid gap-3 text-sm">
                 {INCLUDED.map((feature) => (
                   <li className="flex items-start gap-3" key={feature}>
-                    <span className="mt-0.5 flex size-4.5 shrink-0 items-center justify-center rounded-full border border-emerald-500/20 bg-emerald-500/10 text-emerald-600">
+                    <span className="mt-0.5 flex size-4.5 shrink-0 items-center justify-center rounded-full border border-planetary/20 bg-planetary/10 text-planetary">
                       <Check className="size-3" />
                     </span>
                     <span className="leading-relaxed text-foreground/95">{feature}</span>

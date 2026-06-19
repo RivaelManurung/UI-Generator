@@ -1,13 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { MoreHorizontal, Plus } from "lucide-react";
+import { MoreHorizontal, Palette, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import { AdminShell } from "@/components/layout/admin-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -27,6 +26,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Reveal, RevealGroup, RevealItem } from "@/components/ui/reveal";
+import { SectionCard, SectionCardHeader } from "@/components/ui/section-card";
 import {
   Select,
   SelectContent,
@@ -35,15 +36,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import { adminService, THEME_LIBRARIES } from "@/lib/services/admin-service";
 import type {
   AdminTheme,
@@ -247,108 +241,172 @@ export default function AdminThemesPage() {
         </Button>
       }
     >
-      <Card>
-        <CardContent className="p-0">
-          {selectedIds.size > 0 ? (
-            <div className="flex flex-wrap items-center gap-3 border-b border-border bg-muted/40 px-4 py-2">
-              <span className="text-sm font-medium tabular-nums">
-                {selectedIds.size} selected
+      <Reveal>
+        <SectionCard>
+          <SectionCardHeader
+          title="Theme library"
+          description="UI kits available to generated interfaces. Select rows for bulk actions."
+          action={
+            !loading && total > 0 ? (
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="select-all-visible"
+                  aria-label="Select all on this page"
+                  checked={allVisibleSelected}
+                  onCheckedChange={(value) => toggleAllVisible(value === true)}
+                />
+                <Label
+                  htmlFor="select-all-visible"
+                  className="cursor-pointer text-xs font-medium text-muted-foreground"
+                >
+                  Select page
+                </Label>
+              </div>
+            ) : null
+          }
+        />
+
+        {selectedIds.size > 0 ? (
+          <div className="mx-5 mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-planetary/25 bg-sky/30 px-4 py-2.5">
+            <span className="text-sm font-semibold tabular-nums text-galaxy">
+              {selectedIds.size} selected
+            </span>
+            <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>
+              Clear
+            </Button>
+            <Separator orientation="vertical" className="h-5 bg-planetary/20" />
+            <Button variant="destructive" size="sm" onClick={() => setBulkOpen(true)}>
+              Delete selected
+            </Button>
+          </div>
+        ) : null}
+
+        <div className="px-5 pb-5">
+          {loading ? (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <div
+                  key={`skeleton-${index}`}
+                  className="rounded-2xl border border-border bg-card p-4"
+                >
+                  <div className="flex items-center gap-3">
+                    <Skeleton className="size-10 rounded-xl" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-2/3" />
+                      <Skeleton className="h-3 w-1/3" />
+                    </div>
+                  </div>
+                  <Skeleton className="mt-4 h-3 w-full" />
+                  <Skeleton className="mt-2 h-3 w-4/5" />
+                </div>
+              ))}
+            </div>
+          ) : themes.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-planetary/25 bg-sky/20 px-6 py-16 text-center">
+              <span className="flex size-12 items-center justify-center rounded-2xl bg-planetary/10 text-planetary">
+                <Palette className="size-6" />
               </span>
-              <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>
-                Clear
-              </Button>
-              <Separator orientation="vertical" className="h-5" />
-              <Button variant="destructive" size="sm" onClick={() => setBulkOpen(true)}>
-                Delete selected
+              <div className="space-y-1">
+                <p className="text-sm font-bold text-galaxy">No themes yet</p>
+                <p className="text-sm text-muted-foreground">
+                  Create your first UI kit to make it available to generated interfaces.
+                </p>
+              </div>
+              <Button size="sm" onClick={openCreate}>
+                <Plus className="size-4" />
+                New theme
               </Button>
             </div>
-          ) : null}
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-10">
-                  <Checkbox
-                    aria-label="Select all"
-                    checked={allVisibleSelected}
-                    onCheckedChange={(value) => toggleAllVisible(value === true)}
-                  />
-                </TableHead>
-                <TableHead>Kit</TableHead>
-                <TableHead>Library</TableHead>
-                <TableHead>Slug</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead className="w-12" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                Array.from({ length: 3 }).map((_, index) => (
-                  <TableRow key={`skeleton-${index}`}>
-                    <TableCell colSpan={6}>
-                      <Skeleton className="h-6 w-full" />
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : themes.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="py-16 text-center text-muted-foreground">
-                    No themes yet. Create your first one.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                paged.map((theme) => (
-                  <TableRow key={theme.slug}>
-                    <TableCell>
-                      <Checkbox
-                        aria-label="Select row"
-                        checked={selectedIds.has(theme.slug)}
-                        onCheckedChange={(value) => toggleOne(theme.slug, value === true)}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
+          ) : (
+            <RevealGroup
+              className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+              stagger={0.05}
+            >
+              {paged.map((theme) => {
+                const isSelected = selectedIds.has(theme.slug);
+                return (
+                  <RevealItem key={theme.slug} className="contents">
+                    <article
+                      className={cn(
+                        "group relative flex flex-col gap-3 rounded-2xl border bg-card p-4 transition-all duration-200",
+                        isSelected
+                          ? "border-planetary ring-1 ring-planetary"
+                          : "border-border hover:-translate-y-0.5 hover:border-planetary/30 hover:shadow-brand-sm",
+                      )}
+                    >
+                      <div className="flex items-start gap-3">
+                        <Checkbox
+                          aria-label={`Select ${theme.name}`}
+                          checked={isSelected}
+                          onCheckedChange={(value) => toggleOne(theme.slug, value === true)}
+                          className="mt-1.5"
+                        />
                         <span
-                          className="size-5 shrink-0 rounded-full ring-1 ring-border"
+                          aria-hidden
+                          className="size-10 shrink-0 rounded-xl ring-1 ring-galaxy/10 ring-inset"
                           style={{ backgroundColor: theme.accent }}
                         />
-                        <span className="font-semibold tracking-normal">{theme.name}</span>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="truncate font-semibold tracking-normal text-galaxy">
+                            {theme.name}
+                          </h3>
+                          <p className="truncate font-mono text-xs text-muted-foreground">
+                            {theme.slug}
+                          </p>
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="-mr-1 -mt-1 size-8 shrink-0 text-muted-foreground"
+                              aria-label={`Actions for ${theme.name}`}
+                            >
+                              <MoreHorizontal className="size-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => openEdit(theme)}>Edit</DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              variant="destructive"
+                              onClick={() => setDeleteTarget(theme)}
+                            >
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{libraryLabel(theme.library)}</Badge>
-                    </TableCell>
-                    <TableCell className="font-mono text-sm text-muted-foreground">
-                      {theme.slug}
-                    </TableCell>
-                    <TableCell className="max-w-xs truncate text-sm text-muted-foreground">
-                      {theme.description}
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" aria-label="Theme actions">
-                            <MoreHorizontal className="size-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openEdit(theme)}>Edit</DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            variant="destructive"
-                            onClick={() => setDeleteTarget(theme)}
-                          >
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+
+                      <p className="line-clamp-2 min-h-[2.5rem] text-sm leading-5 text-muted-foreground">
+                        {theme.description || "No description provided."}
+                      </p>
+
+                      <div className="mt-auto flex items-center gap-2 pt-1">
+                        <Badge
+                          variant="secondary"
+                          className="border-planetary/15 bg-sky/40 font-medium text-galaxy"
+                        >
+                          {libraryLabel(theme.library)}
+                        </Badge>
+                        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <span
+                            aria-hidden
+                            className="size-3 rounded-full ring-1 ring-galaxy/10"
+                            style={{ backgroundColor: theme.accent }}
+                          />
+                          <span className="font-mono uppercase">{theme.accent}</span>
+                        </span>
+                      </div>
+                    </article>
+                  </RevealItem>
+                );
+              })}
+            </RevealGroup>
+          )}
+
           {!loading && total > 0 ? (
-            <div className="flex flex-col gap-3 border-t border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="mt-5 flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm text-muted-foreground tabular-nums">
                 Showing {start}–{end} of {total}
               </p>
@@ -375,8 +433,9 @@ export default function AdminThemesPage() {
               </div>
             </div>
           ) : null}
-        </CardContent>
-      </Card>
+        </div>
+        </SectionCard>
+      </Reveal>
 
       <Dialog open={bulkOpen} onOpenChange={(open) => (!open ? setBulkOpen(false) : null)}>
         <DialogContent className="sm:max-w-md">

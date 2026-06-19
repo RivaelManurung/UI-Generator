@@ -28,6 +28,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Reveal, RevealGroup, RevealItem } from "@/components/ui/reveal";
 import { authService } from "@/lib/services/auth-service";
 import { cn } from "@/lib/utils";
 
@@ -93,10 +94,10 @@ export default function RegisterPage() {
         </div>
 
         <div className="flex flex-1 items-center justify-center py-10">
-          <div className="w-full max-w-sm">
-            <Card className="border-border">
+          <Reveal className="w-full max-w-sm">
+            <Card className="border-border shadow-brand-sm">
               <CardHeader>
-                <CardTitle className="text-2xl">Create your account</CardTitle>
+                <CardTitle className="text-2xl tracking-normal">Create your account</CardTitle>
                 <CardDescription>
                   Start with 12 demo credits and a seeded workspace.
                 </CardDescription>
@@ -260,7 +261,7 @@ export default function RegisterPage() {
                 </p>
               </CardFooter>
             </Card>
-          </div>
+          </Reveal>
         </div>
       </div>
 
@@ -271,30 +272,31 @@ export default function RegisterPage() {
 
 function AuthAside() {
   return (
-    <aside className="relative hidden overflow-hidden border-l border-border bg-muted/30 lg:block">
-      <div className="grid-bg pointer-events-none absolute inset-0" />
-      <div className="glow pointer-events-none absolute inset-x-0 top-0 h-96" />
-      <div className="relative flex h-full flex-col justify-center px-12 py-16">
-        <div className="inline-flex w-fit items-center gap-2 rounded-full border border-border bg-card/60 px-3 py-1 text-xs font-medium text-muted-foreground backdrop-blur">
-          <CheckCircle2 className="size-3.5 text-primary" />
+    <aside className="landing-hero relative hidden overflow-hidden border-l border-landing-border lg:block">
+      <div className="glow pointer-events-none absolute inset-x-0 top-0 h-96 opacity-70" />
+      <Reveal className="relative flex h-full flex-col justify-center px-12 py-16">
+        <span className="landing-pill inline-flex w-fit items-center gap-2 rounded-full px-3 py-1 text-xs font-medium tracking-normal">
+          <CheckCircle2 className="size-3.5 text-planetary" aria-hidden="true" />
           Free to start
-        </div>
-        <h2 className="text-balance mt-6 max-w-md text-3xl font-bold leading-tight tracking-tight">
+        </span>
+        <h2 className="mt-6 max-w-md text-balance text-3xl font-bold leading-[1.12] tracking-normal">
           Go from data model to live dashboard in minutes.
         </h2>
-        <p className="text-balance mt-4 max-w-md text-muted-foreground">
-          Join teams building schema-first dashboards with DashboardCraft:
-          validated, component-ready, and production-shaped.
+        <p className="landing-text-soft mt-4 max-w-md text-balance leading-7">
+          Join teams building schema-first dashboards with DashboardCraft: validated, component-ready, and
+          production-shaped.
         </p>
-        <ul className="mt-8 grid gap-4">
+        <RevealGroup className="mt-8 grid gap-4">
           {perks.map((item) => (
-            <li className="flex items-start gap-3 text-sm" key={item}>
-              <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-primary" />
-              <span className="text-foreground/90">{item}</span>
-            </li>
+            <RevealItem key={item}>
+              <div className="flex items-start gap-3 text-sm">
+                <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-planetary" aria-hidden="true" />
+                <span className="text-galaxy/90">{item}</span>
+              </div>
+            </RevealItem>
           ))}
-        </ul>
-      </div>
+        </RevealGroup>
+      </Reveal>
     </aside>
   );
 }

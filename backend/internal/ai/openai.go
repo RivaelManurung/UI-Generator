@@ -71,7 +71,7 @@ type oaiResponse struct {
 	} `json:"error,omitempty"`
 }
 
-func (p *OpenAIProvider) complete(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
+func (p *OpenAIProvider) complete(ctx context.Context, systemPrompt, userPrompt string, temperature float64) (string, error) {
 	var err error
 	defer func() {
 		if err != nil {
@@ -79,10 +79,19 @@ func (p *OpenAIProvider) complete(ctx context.Context, systemPrompt, userPrompt 
 		}
 	}()
 
+	// Defensive clamp: <=0 means an unset caller; cap at 1.0 so a high creative
+	// roll never trips providers that reject extreme temperatures.
+	if temperature <= 0 {
+		temperature = 0.7
+	}
+	if temperature > 1.0 {
+		temperature = 1.0
+	}
+
 	reqBody := oaiRequest{
 		Model:       p.model,
-		Temperature: 0.7,   // varied output without tipping into malformed JSON (which forces a mock fallback)
-		MaxTokens:   32768, // multi-page JSON is long, and reasoning models (MiniMax-M3) also spend tokens on a <think> block — 8192 truncated 3-page output into broken JSON
+		Temperature: temperature, // rolled per call by the variation engine; a calmer retry recovers any malformed JSON
+		MaxTokens:   32768,       // multi-page JSON is long, and reasoning models (MiniMax-M3) also spend tokens on a <think> block — 8192 truncated 3-page output into broken JSON
 		Messages: []oaiMessage{
 			{Role: "system", Content: systemPrompt},
 			{Role: "user", Content: userPrompt},
@@ -161,19 +170,38 @@ func (p *OpenAIProvider) complete(ctx context.Context, systemPrompt, userPrompt 
 }
 
 func (p *OpenAIProvider) GenerateSchema(ctx context.Context, request GenerateRequest) (GenerateResponse, error) {
-	content, err := p.complete(ctx, schemaSystemPrompt(), schemaUserPrompt(request))
-	if err != nil {
-		return GenerateResponse{}, err
+	// Roll a fresh creative direction each call so the SAME brief produces a
+	// distinct design every time (Stitch-like). The 2-attempt loop means the
+	// higher creative temperature never increases the malformed-JSON → mock
+	// fallback rate: a calmer retry recovers the rare broken response.
+	var lastErr error
+	for attempt := 0; attempt < 2; attempt++ {
+		if cerr := ctx.Err(); cerr != nil {
+			return GenerateResponse{}, cerr
+		}
+		v := newVariation()
+		if attempt > 0 {
+			v.Temperature = 0.6 // calmer retry to recover valid JSON
+		}
+		content, err := p.complete(ctx, schemaSystemPrompt(), schemaUserPrompt(request, v), v.Temperature)
+		if err != nil {
+			lastErr = err
+			log.Printf("GenerateSchema: provider call failed (attempt %d): %v", attempt+1, err)
+			continue
+		}
+		pageSchema, perr := parseSchemaJSON(content)
+		if perr != nil {
+			lastErr = perr
+			log.Printf("GenerateSchema: parse/guardrail failed (attempt %d): %v", attempt+1, perr)
+			continue
+		}
+		return GenerateResponse{
+			Schema:       pageSchema,
+			ProviderName: "openai",
+			Metadata:     map[string]string{"model": p.model, "baseUrl": p.baseURL, "variation": fmt.Sprintf("%d", v.Seed%100000)},
+		}, nil
 	}
-	pageSchema, err := parseSchemaJSON(content)
-	if err != nil {
-		return GenerateResponse{}, err
-	}
-	return GenerateResponse{
-		Schema:       pageSchema,
-		ProviderName: "openai",
-		Metadata:     map[string]string{"model": p.model, "baseUrl": p.baseURL},
-	}, nil
+	return GenerateResponse{}, lastErr
 }
 
 func (p *OpenAIProvider) RefineSection(ctx context.Context, request RefineRequest) (GenerateResponse, error) {
@@ -185,7 +213,9 @@ func (p *OpenAIProvider) RefineSection(ctx context.Context, request RefineReques
 	user := fmt.Sprintf("Current page schema:\n%s\n\nRefine the section at index %d per this wish: %q.\nReturn the full modified page schema JSON; keep all other sections unchanged.",
 		string(schemaBytes), request.SectionIndex, request.Prompt)
 
-	content, err := p.complete(ctx, system, user)
+	// Refine must be precise (apply the wish, change nothing else), so use a low
+	// temperature — variation belongs to fresh generation, not edits.
+	content, err := p.complete(ctx, system, user, 0.4)
 	if err != nil {
 		return GenerateResponse{}, err
 	}
@@ -216,7 +246,11 @@ func (p *OpenAIProvider) GenerateApp(ctx context.Context, request AppRequest) (A
 	// only on failure — far cheaper than shipping a mock page to the user.
 	var parsed []schema.PageSchema
 	for attempt := 0; attempt < 2; attempt++ {
-		content, err := p.complete(ctx, appSystemPrompt(), appUserPrompt(request))
+		v := newVariation()
+		if attempt > 0 {
+			v.Temperature = 0.6 // calmer retry to recover valid JSON
+		}
+		content, err := p.complete(ctx, appSystemPrompt(), appUserPrompt(request, v), v.Temperature)
 		if err != nil {
 			log.Printf("GenerateApp: provider call failed (attempt %d): %v", attempt+1, err)
 			continue
@@ -277,7 +311,9 @@ Rules:
 Output ONLY this JSON array (most to least important):
 [{"name":"...","pageType":"..."}]`, prompt, domain)
 
-	content, err := p.complete(ctx, system, user)
+	// Page planning should be stable (a fixed page set for a given brief), so
+	// keep it low-temperature — variation happens when filling each page.
+	content, err := p.complete(ctx, system, user, 0.4)
 	if err != nil {
 		return nil, err
 	}
@@ -303,7 +339,7 @@ func appSystemPrompt() string {
 	return "You are a senior UI/Dashboard generator. You design a multi-page dashboard app. Respond with ONLY valid minified JSON — no markdown, no code fences, no commentary."
 }
 
-func appUserPrompt(request AppRequest) string {
+func appUserPrompt(request AppRequest, v variation) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Generate a coherent multi-page dashboard app as JSON for this brief.\nBrief: %q\nDomain: %q\nThemeSlug: %q\n\n", request.Prompt, request.Domain, request.ThemeSlug)
 	b.WriteString("Produce EXACTLY these pages, in this order. Each page MUST cover a DISTINCT module/feature area of the brief — never repeat the same data, metrics, or table across pages:\n")
@@ -325,6 +361,7 @@ Tailor all labels/metrics/columns/rows to the brief and domain (specific, realis
 
 Output ONLY this JSON object:
 {"pages":[ <page1>, <page2>, ... ]}`)
+	b.WriteString(v.directive())
 	return b.String()
 }
 
@@ -454,7 +491,7 @@ func requirementsFor(pageType string) string {
 	}
 }
 
-func schemaUserPrompt(request GenerateRequest) string {
+func schemaUserPrompt(request GenerateRequest, v variation) string {
 	return fmt.Sprintf(`Generate a dashboard page schema as JSON for this brief.
 Brief: %q
 PageType: %q
@@ -499,7 +536,7 @@ Shape (set "layout", "brand", "nav" yourself per the rules above):
 {"pageType":%q,"domain":%q,"layout":"admin-sidebar | top-nav","theme":%q,"title":"...","brand":"...","nav":["...","..."],"sections":[ ... ]}`,
 		request.Prompt, request.PageType, request.Domain, request.ThemeSlug,
 		requirementsFor(request.PageType),
-		request.PageType, request.Domain, request.ThemeSlug)
+		request.PageType, request.Domain, request.ThemeSlug) + v.directive()
 }
 
 func parseSchemaJSON(content string) (schema.PageSchema, error) {

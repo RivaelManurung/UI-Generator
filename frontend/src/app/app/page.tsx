@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FolderKanban, Wallet, Activity, Gauge } from "lucide-react";
 
 import { AppShell } from "@/components/app/app-shell";
+import { Reveal } from "@/components/ui/reveal";
 import { CreditWallet } from "@/components/dashboard/credit-wallet";
 import { OverviewCards, type OverviewStat } from "@/components/dashboard/overview-card";
 import { RecentProjects } from "@/components/dashboard/recent-projects";
@@ -71,7 +72,7 @@ export default function UserDashboardPage() {
 
         <OverviewCards stats={stats} loading={balanceLoading || projectsLoading} />
 
-        <div className="grid gap-5 xl:grid-cols-12">
+        <Reveal className="grid gap-5 xl:grid-cols-12">
           <div className="xl:col-span-7">
             <RecentProjects projects={projects} loading={projectsLoading} />
           </div>
@@ -82,7 +83,7 @@ export default function UserDashboardPage() {
               loading={balanceLoading || transactionsLoading}
             />
           </div>
-        </div>
+        </Reveal>
       </div>
     </AppShell>
   );

@@ -41,9 +41,9 @@ export function CreditWallet({
           </div>
         ) : (
           <>
-            <div className="rounded-xl border border-border bg-muted/40 p-4">
+            <div className="rounded-xl border border-planetary/15 bg-sky/40 p-4">
               <p className="text-sm font-medium text-muted-foreground">Available credits</p>
-              <p className="mt-1 text-4xl font-bold tabular-nums tracking-normal text-foreground">
+              <p className="mt-1 text-4xl font-bold tabular-nums tracking-normal text-galaxy">
                 {available.toLocaleString()}
               </p>
               <div className="mt-4">
@@ -68,7 +68,7 @@ export function CreditWallet({
                   {items.map((tx) => (
                     <li
                       key={tx.id}
-                      className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-3 py-2.5"
+                      className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-3 py-2.5 transition-colors hover:border-planetary/20 hover:bg-sky/20"
                     >
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium text-foreground">{tx.description}</p>

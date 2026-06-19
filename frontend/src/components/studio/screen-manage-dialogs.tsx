@@ -262,7 +262,8 @@ function RegenerateDialog({
         <DialogHeader>
           <DialogTitle>Regenerate screen</DialogTitle>
           <DialogDescription className="text-xs">
-            Rebuild just this screen from a new prompt. Costs 1 credit.
+            Rebuild just this screen from a new prompt. Costs{" "}
+            <span className="font-semibold text-planetary">1 credit</span>.
           </DialogDescription>
         </DialogHeader>
         <form

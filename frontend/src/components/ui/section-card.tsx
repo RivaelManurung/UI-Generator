@@ -12,8 +12,8 @@ export function SectionCard({
   return (
     <section
       className={cn(
-        "rounded-2xl border border-border/90 bg-card shadow-[0_1px_2px_rgba(15,23,42,0.08),0_12px_30px_rgba(15,23,42,0.04)] ring-1 ring-foreground/[0.04]",
-        "before:pointer-events-none before:block before:h-px before:w-full before:bg-gradient-to-r before:from-transparent before:via-foreground/20 before:to-transparent",
+        "rounded-2xl border border-border/90 bg-card shadow-[0_1px_2px_rgba(8,31,92,0.06),0_12px_30px_rgba(8,31,92,0.05)] ring-1 ring-galaxy/[0.04]",
+        "before:pointer-events-none before:block before:h-px before:w-full before:bg-gradient-to-r before:from-transparent before:via-galaxy/15 before:to-transparent",
         className,
       )}
     >

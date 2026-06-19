@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, MoreHorizontal } from "lucide-react";
+import { FolderKanban, Loader2, MoreHorizontal, Search } from "lucide-react";
 
 import { AdminShell } from "@/components/layout/admin-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Reveal } from "@/components/ui/reveal";
+import { SectionCard } from "@/components/ui/section-card";
 import { Separator } from "@/components/ui/separator";
 import {
   Dialog,
@@ -48,10 +49,20 @@ function formatDate(value: string) {
 function statusBadge(status: AdminProject["status"]) {
   if (status === "active") {
     return (
-      <Badge className="border-transparent bg-success-bg text-success-foreground">active</Badge>
+      <Badge className="border-transparent bg-success-bg text-success-foreground">
+        <span className="mr-1 size-1.5 rounded-full bg-success" aria-hidden />
+        active
+      </Badge>
     );
   }
-  if (status === "draft") return <Badge variant="secondary">draft</Badge>;
+  if (status === "draft") {
+    return (
+      <Badge className="border-transparent bg-sky/70 text-galaxy">
+        <span className="mr-1 size-1.5 rounded-full bg-universe" aria-hidden />
+        draft
+      </Badge>
+    );
+  }
   return <Badge variant="outline">archived</Badge>;
 }
 
@@ -178,23 +189,30 @@ export default function AdminProjectsPage() {
         </Button>
       }
     >
-      <Card>
-        <CardContent className="space-y-4">
+      <Reveal>
+        <SectionCard className="space-y-4 p-4 sm:p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <Input
-              placeholder="Search name or owner email"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              className="h-8 w-full sm:w-72"
-            />
-            <p className="text-sm text-muted-foreground">
-              {filtered.length} of {projects.length} projects
+            <div className="relative w-full sm:w-72">
+              <Search
+                className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                aria-hidden
+              />
+              <Input
+                placeholder="Search name or owner email"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                className="h-9 w-full pl-8"
+              />
+            </div>
+            <p className="text-sm text-muted-foreground tabular-nums">
+              <span className="font-semibold text-foreground">{filtered.length}</span> of{" "}
+              {projects.length} projects
             </p>
           </div>
 
           {selectedIds.size > 0 ? (
-            <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/40 px-3 py-2">
-              <span className="text-sm font-medium tabular-nums">
+            <div className="flex flex-wrap items-center gap-3 rounded-xl border border-planetary/20 bg-sky/40 px-3 py-2">
+              <span className="text-sm font-semibold tabular-nums text-galaxy">
                 {selectedIds.size} selected
               </span>
               <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>
@@ -207,10 +225,10 @@ export default function AdminProjectsPage() {
             </div>
           ) : null}
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto rounded-xl border border-border">
             <Table>
               <TableHeader>
-                <TableRow>
+                <TableRow className="bg-muted/50 hover:bg-muted/50">
                   <TableHead className="w-10">
                     <Checkbox
                       aria-label="Select all"
@@ -218,14 +236,30 @@ export default function AdminProjectsPage() {
                       onCheckedChange={(value) => toggleAllVisible(value === true)}
                     />
                   </TableHead>
-                  <TableHead>Project</TableHead>
-                  <TableHead>Owner</TableHead>
-                  <TableHead>Domain</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Pages</TableHead>
-                  <TableHead className="text-right">Quality</TableHead>
-                  <TableHead>Updated</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
+                    Project
+                  </TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
+                    Owner
+                  </TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
+                    Domain
+                  </TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
+                    Status
+                  </TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-normal text-muted-foreground">
+                    Pages
+                  </TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-normal text-muted-foreground">
+                    Quality
+                  </TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
+                    Updated
+                  </TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-normal text-muted-foreground">
+                    Actions
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -238,14 +272,32 @@ export default function AdminProjectsPage() {
                     </TableRow>
                   ))
                 ) : filtered.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={9} className="text-center text-muted-foreground">
-                      No projects yet
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={9} className="py-14">
+                      <div className="flex flex-col items-center gap-3 text-center">
+                        <span className="flex size-12 items-center justify-center rounded-2xl bg-sky/60 text-planetary">
+                          {search ? (
+                            <Search className="size-6" aria-hidden />
+                          ) : (
+                            <FolderKanban className="size-6" aria-hidden />
+                          )}
+                        </span>
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">
+                            {search ? "No matching projects" : "No projects yet"}
+                          </p>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            {search
+                              ? "Try a different name or owner email."
+                              : "Projects created across all accounts will appear here."}
+                          </p>
+                        </div>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ) : (
                   paged.map((project) => (
-                    <TableRow key={project.id}>
+                    <TableRow key={project.id} className="group hover:bg-sky/30">
                       <TableCell>
                         <Checkbox
                           aria-label="Select row"
@@ -253,25 +305,30 @@ export default function AdminProjectsPage() {
                           onCheckedChange={(value) => toggleOne(project.id, value === true)}
                         />
                       </TableCell>
-                      <TableCell className="font-medium text-foreground">{project.name}</TableCell>
+                      <TableCell className="font-semibold text-foreground">{project.name}</TableCell>
                       <TableCell className="text-muted-foreground">{project.ownerEmail}</TableCell>
                       <TableCell>
                         <Badge variant="outline">{project.domain}</Badge>
                       </TableCell>
                       <TableCell>{statusBadge(project.status)}</TableCell>
-                      <TableCell className="text-right tabular-nums">
+                      <TableCell className="text-right tabular-nums text-foreground">
                         {project.pagesCount}
                       </TableCell>
-                      <TableCell className="text-right tabular-nums">
+                      <TableCell className="text-right tabular-nums text-foreground">
                         {project.qualityAverage}
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
+                      <TableCell className="text-muted-foreground tabular-nums">
                         {formatDate(project.updatedAt)}
                       </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon-sm" aria-label="Project actions">
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label="Project actions"
+                              className="text-muted-foreground group-hover:text-planetary"
+                            >
                               <MoreHorizontal />
                             </Button>
                           </DropdownMenuTrigger>
@@ -320,8 +377,8 @@ export default function AdminProjectsPage() {
               </div>
             </div>
           ) : null}
-        </CardContent>
-      </Card>
+        </SectionCard>
+      </Reveal>
 
       <Dialog open={bulkOpen} onOpenChange={(open) => (!open ? setBulkOpen(false) : null)}>
         <DialogContent>
