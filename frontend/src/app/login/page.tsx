@@ -32,6 +32,7 @@ import { Separator } from "@/components/ui/separator";
 import { Reveal, RevealGroup, RevealItem } from "@/components/ui/reveal";
 import {
   clearSession,
+  getAccessToken,
   getBypassSession,
   isAuthBypassEnabled,
   saveSession,
@@ -59,10 +60,37 @@ export default function LoginPage() {
   const redirect = searchParams.get("redirect") || "/app";
   const [showPassword, setShowPassword] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [checkingSession, setCheckingSession] = useState(true);
 
   useEffect(() => {
-    clearSession();
-  }, []);
+    let active = true;
+
+    async function checkAuth() {
+      const token = getAccessToken();
+      if (!token) {
+        if (active) setCheckingSession(false);
+        return;
+      }
+
+      try {
+        await authService.getCurrentUser();
+        if (active) {
+          router.replace(redirect);
+        }
+      } catch {
+        if (active) {
+          clearSession();
+          setCheckingSession(false);
+        }
+      }
+    }
+
+    checkAuth();
+
+    return () => {
+      active = false;
+    };
+  }, [router, redirect]);
 
   const {
     register,
@@ -86,6 +114,14 @@ export default function LoginPage() {
   function startBypassSession() {
     saveSession(getBypassSession());
     router.push(redirect);
+  }
+
+  if (checkingSession) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" aria-label="Checking session" />
+      </main>
+    );
   }
 
   return (

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -29,6 +29,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Reveal, RevealGroup, RevealItem } from "@/components/ui/reveal";
+import { getAccessToken, clearSession } from "@/lib/api/auth";
 import { authService } from "@/lib/services/auth-service";
 import { cn } from "@/lib/utils";
 
@@ -60,6 +61,37 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [checkingSession, setCheckingSession] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+
+    async function checkAuth() {
+      const token = getAccessToken();
+      if (!token) {
+        if (active) setCheckingSession(false);
+        return;
+      }
+
+      try {
+        await authService.getCurrentUser();
+        if (active) {
+          router.replace("/app");
+        }
+      } catch {
+        if (active) {
+          clearSession();
+          setCheckingSession(false);
+        }
+      }
+    }
+
+    checkAuth();
+
+    return () => {
+      active = false;
+    };
+  }, [router]);
 
   const {
     register,
@@ -80,6 +112,14 @@ export default function RegisterPage() {
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : "Registration failed");
     }
+  }
+
+  if (checkingSession) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" aria-label="Checking session" />
+      </main>
+    );
   }
 
   return (
