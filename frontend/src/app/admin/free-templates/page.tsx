@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ExternalLink, FileStack, Loader2, Plus, Trash2 } from "lucide-react";
@@ -9,24 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Reveal } from "@/components/ui/reveal";
 import { SectionCard } from "@/components/ui/section-card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -35,15 +19,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useProjects } from "@/hooks/use-projects";
-import { generationService, type GeneratedPage } from "@/lib/services/generation-service";
 import { freeTemplateService } from "@/lib/services/free-template-service";
 import type { AdminFreeTemplate } from "@/types/free-template";
 
 export default function AdminFreeTemplatesPage() {
   const [items, setItems] = useState<AdminFreeTemplate[]>([]);
   const [loading, setLoading] = useState(true);
-  const [publishOpen, setPublishOpen] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -83,9 +64,11 @@ export default function AdminFreeTemplatesPage() {
       title="Free Templates"
       subtitle="Publish generated pages as free, downloadable templates on the public site."
       actions={
-        <Button size="sm" onClick={() => setPublishOpen(true)}>
-          <Plus className="h-4 w-4" />
-          Publish template
+        <Button size="sm" asChild>
+          <Link href="/admin/free-templates/new">
+            <Plus className="h-4 w-4" />
+            Publish template
+          </Link>
         </Button>
       }
     >
@@ -200,186 +183,6 @@ export default function AdminFreeTemplatesPage() {
           )}
         </SectionCard>
       </Reveal>
-
-      <PublishDialog
-        open={publishOpen}
-        onOpenChange={setPublishOpen}
-        onPublished={() => {
-          setPublishOpen(false);
-          load();
-        }}
-      />
     </AdminShell>
-  );
-}
-
-function PublishDialog({
-  open,
-  onOpenChange,
-  onPublished,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onPublished: () => void;
-}) {
-  const { projects } = useProjects();
-  const [projectId, setProjectId] = useState("");
-  const [pages, setPages] = useState<GeneratedPage[]>([]);
-  const [pageId, setPageId] = useState("");
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (!projectId) {
-      setPages([]);
-      setPageId("");
-      return;
-    }
-    let cancelled = false;
-    generationService
-      .getProjectPages(projectId)
-      .then((ps) => {
-        if (!cancelled) setPages(ps);
-      })
-      .catch(() => {
-        if (!cancelled) setPages([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId]);
-
-  useEffect(() => {
-    const page = pages.find((p) => p.id === pageId);
-    if (page) setTitle((prev) => prev || page.name);
-  }, [pageId, pages]);
-
-  async function submit() {
-    if (!pageId || !title.trim()) {
-      toast.error("Pick a page and enter a title");
-      return;
-    }
-    setSubmitting(true);
-    try {
-      await freeTemplateService.publish({
-        title: title.trim(),
-        description: description.trim(),
-        category: category.trim(),
-        sourcePageId: pageId,
-      });
-      toast.success("Published as a free template");
-      setProjectId("");
-      setPageId("");
-      setTitle("");
-      setDescription("");
-      setCategory("");
-      onPublished();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Publish failed");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[460px]">
-        <DialogHeader>
-          <DialogTitle>Publish free template</DialogTitle>
-          <DialogDescription>
-            Pick a generated page to snapshot and publish as a free, downloadable template.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="grid gap-4">
-          <div className="grid gap-2">
-            <Label>Project</Label>
-            <Select value={projectId} onValueChange={setProjectId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a project" />
-              </SelectTrigger>
-              <SelectContent>
-                {projects.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid gap-2">
-            <Label>Page</Label>
-            <Select value={pageId} onValueChange={setPageId} disabled={pages.length === 0}>
-              <SelectTrigger>
-                <SelectValue
-                  placeholder={
-                    !projectId
-                      ? "Select a project first"
-                      : pages.length === 0
-                        ? "No generated pages"
-                        : "Select a page"
-                  }
-                />
-              </SelectTrigger>
-              <SelectContent>
-                {pages.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name} ({p.pageType})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid gap-2">
-            <Label htmlFor="ft-title">Title</Label>
-            <Input
-              id="ft-title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="MasjidCare — Financial Reports"
-            />
-          </div>
-
-          <div className="grid gap-2">
-            <Label htmlFor="ft-category">
-              Category <span className="font-normal text-muted-foreground">(optional)</span>
-            </Label>
-            <Input
-              id="ft-category"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              placeholder="dashboard"
-            />
-          </div>
-
-          <div className="grid gap-2">
-            <Label htmlFor="ft-desc">
-              Description <span className="font-normal text-muted-foreground">(optional)</span>
-            </Label>
-            <Textarea
-              id="ft-desc"
-              className="min-h-20 resize-none"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Short summary shown on the card."
-            />
-          </div>
-
-          <div className="flex justify-end gap-2 pt-1">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button onClick={submit} disabled={submitting || !pageId || !title.trim()}>
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              Publish
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
   );
 }

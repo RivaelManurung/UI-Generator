@@ -50,7 +50,6 @@ type PageVersionRepository interface {
 
 type GenerationJobRepository interface {
 	Create(ctx context.Context, job domain.GenerationJob) (domain.GenerationJob, error)
-	FindByRequestID(ctx context.Context, requestID string) (domain.GenerationJob, error)
 	FindOwned(ctx context.Context, userID string, jobID string) (domain.GenerationJob, error)
 	ListForAdmin(ctx context.Context) ([]domain.GenerationJob, error)
 	UpdateStatus(ctx context.Context, jobID string, status string, errorMessage string) error

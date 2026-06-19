@@ -187,6 +187,12 @@ func registerV1(v1 *gin.RouterGroup, h *handlers.Handler, verifier middleware.To
 		admin.GET("/users", h.FEAdminUsers)
 		admin.PATCH("/users/:id", validateUUIDParams("id"), h.FEAdminUpdateUser)
 		admin.DELETE("/users/:id", validateUUIDParams("id"), h.FEAdminDeleteUser)
+		// Per-user 360° admin view.
+		admin.GET("/users/:id/overview", validateUUIDParams("id"), h.FEAdminUserOverview)
+		admin.GET("/users/:id/payments", validateUUIDParams("id"), h.FEAdminUserPayments)
+		admin.GET("/users/:id/transactions", validateUUIDParams("id"), h.FEAdminUserTransactions)
+		admin.GET("/users/:id/generations", validateUUIDParams("id"), h.FEAdminUserGenerations)
+		admin.GET("/users/:id/projects", validateUUIDParams("id"), h.FEAdminUserProjects)
 		admin.GET("/generation-jobs", h.FEAdminGenerationJobs)
 		admin.POST("/generation-jobs/:id/retry", validateUUIDParams("id"), h.FEAdminRetryGeneration)
 		admin.GET("/projects", h.FEAdminProjects)

@@ -1328,7 +1328,20 @@ func (f *FrontendService) UpdateSecurity(ctx context.Context, userID string, pat
 	return f.updateJSONColumn(ctx, userID, "security", patch)
 }
 
+// allowedSettingsColumns is the strict allowlist of user_settings JSONB columns
+// updateJSONColumn may write. The column name is interpolated into SQL (pgx
+// cannot parameterize identifiers), so it MUST be validated against this map to
+// foreclose any possibility of SQL injection via the column argument.
+var allowedSettingsColumns = map[string]bool{
+	"generation_preferences": true,
+	"workspace":              true,
+	"security":               true,
+}
+
 func (f *FrontendService) updateJSONColumn(ctx context.Context, userID, column string, value interface{}) (SettingsDTO, error) {
+	if !allowedSettingsColumns[column] {
+		return SettingsDTO{}, apperrors.Validation("unsupported settings column")
+	}
 	current, err := f.GetSettings(ctx, userID)
 	if err != nil {
 		return SettingsDTO{}, err
@@ -1338,7 +1351,8 @@ func (f *FrontendService) updateJSONColumn(ctx context.Context, userID, column s
 	}
 	_ = f.ensureSettingsRow(ctx, userID, current)
 	raw, _ := json.Marshal(value)
-	// column is a fixed internal constant, never user input.
+	// column is validated against allowedSettingsColumns above, so the only
+	// values that reach this interpolation are the three fixed identifiers.
 	_, err = f.s.pool.Exec(ctx, "UPDATE user_settings SET "+column+"=$2, updated_at=now() WHERE user_id=$1", userID, string(raw))
 	if err != nil {
 		return SettingsDTO{}, err

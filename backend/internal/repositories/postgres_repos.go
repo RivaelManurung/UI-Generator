@@ -393,11 +393,19 @@ func (r *PostgresProjectRepository) UpdateOwned(ctx context.Context, userID stri
 }
 
 func (r *PostgresProjectRepository) SoftDeleteOwned(ctx context.Context, userID string, projectID string) error {
-	err := r.q(ctx).SoftDeleteOwnedProject(ctx, db.SoftDeleteOwnedProjectParams{
+	affected, err := r.q(ctx).SoftDeleteOwnedProject(ctx, db.SoftDeleteOwnedProjectParams{
 		ID:     toUUID(projectID),
 		UserID: toUUID(userID),
 	})
-	return mapDBError(err, "project")
+	if err != nil {
+		return mapDBError(err, "project")
+	}
+	if affected == 0 {
+		// No row matched: the project does not exist, is already deleted, or is
+		// not owned by this user. Surface a 404 instead of a false 200.
+		return apperrors.NotFound("Project not found or you do not have access.")
+	}
+	return nil
 }
 
 type PostgresPageRepository struct {
@@ -683,33 +691,6 @@ func (r *PostgresGenerationJobRepository) Create(ctx context.Context, job domain
 		return domain.GenerationJob{}, mapDBError(err, "generation job")
 	}
 	metrics.IncJobStatus(res.Status)
-	return domain.GenerationJob{
-		ID:           fromUUID(res.ID),
-		UserID:       fromUUID(res.UserID),
-		ProjectID:    fromUUID(res.ProjectID),
-		PageID:       fromUUID(res.PageID),
-		RequestID:    res.RequestID,
-		Status:       res.Status,
-		Prompt:       res.Prompt,
-		PageType:     res.PageType,
-		Domain:       res.Domain,
-		ThemeSlug:    res.ThemeSlug,
-		OutputMode:   res.OutputMode,
-		CreditCost:   int(res.CreditCost),
-		ErrorMessage: fromText(res.ErrorMessage),
-		RetryCount:   int(res.RetryCount),
-		StartedAt:    fromTimestamptz(res.StartedAt),
-		FinishedAt:   fromTimestamptz(res.FinishedAt),
-		CreatedAt:    fromTimestamptz(res.CreatedAt),
-		UpdatedAt:    fromTimestamptz(res.UpdatedAt),
-	}, nil
-}
-
-func (r *PostgresGenerationJobRepository) FindByRequestID(ctx context.Context, requestID string) (domain.GenerationJob, error) {
-	res, err := r.q(ctx).GetGenerationJobByRequestID(ctx, requestID)
-	if err != nil {
-		return domain.GenerationJob{}, mapDBError(err, "generation job")
-	}
 	return domain.GenerationJob{
 		ID:           fromUUID(res.ID),
 		UserID:       fromUUID(res.UserID),

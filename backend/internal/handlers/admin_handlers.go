@@ -16,7 +16,7 @@ func (h *Handler) FEAdminUpdateUser(c *gin.Context) {
 		writeError(c, apperrors.BadRequest("invalid JSON body"))
 		return
 	}
-	user, err := h.frontend.AdminUpdateUser(c.Request.Context(), c.Param("id"), in)
+	user, err := h.frontend.AdminUpdateUser(c.Request.Context(), mustUser(c).ID, c.Param("id"), in)
 	if err != nil {
 		writeServiceError(c, err)
 		return
@@ -25,11 +25,58 @@ func (h *Handler) FEAdminUpdateUser(c *gin.Context) {
 }
 
 func (h *Handler) FEAdminDeleteUser(c *gin.Context) {
-	if err := h.frontend.AdminDeleteUser(c.Request.Context(), c.Param("id")); err != nil {
+	if err := h.frontend.AdminDeleteUser(c.Request.Context(), mustUser(c).ID, c.Param("id")); err != nil {
 		writeServiceError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+// ---- Per-user 360° admin view ----
+
+func (h *Handler) FEAdminUserOverview(c *gin.Context) {
+	dto, err := h.frontend.AdminUserOverview(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		writeServiceError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, dto)
+}
+
+func (h *Handler) FEAdminUserPayments(c *gin.Context) {
+	rows, err := h.frontend.AdminUserPayments(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		writeServiceError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, rows)
+}
+
+func (h *Handler) FEAdminUserTransactions(c *gin.Context) {
+	rows, err := h.frontend.AdminUserTransactions(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		writeServiceError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, rows)
+}
+
+func (h *Handler) FEAdminUserGenerations(c *gin.Context) {
+	rows, err := h.frontend.AdminUserGenerations(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		writeServiceError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, rows)
+}
+
+func (h *Handler) FEAdminUserProjects(c *gin.Context) {
+	rows, err := h.frontend.AdminUserProjects(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		writeServiceError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, rows)
 }
 
 // ---- Projects ----
@@ -44,7 +91,7 @@ func (h *Handler) FEAdminProjects(c *gin.Context) {
 }
 
 func (h *Handler) FEAdminDeleteProject(c *gin.Context) {
-	if err := h.frontend.AdminDeleteProject(c.Request.Context(), c.Param("id")); err != nil {
+	if err := h.frontend.AdminDeleteProject(c.Request.Context(), mustUser(c).ID, c.Param("id")); err != nil {
 		writeServiceError(c, err)
 		return
 	}

@@ -70,6 +70,43 @@ export type AdminUserUpdate = {
   credits?: number;
 };
 
+// ---- Per-user 360° admin view (mirrors backend services/admin_user.go DTOs) ----
+
+export type AdminUserOverview = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  status: string;
+  createdAt: string;
+  walletBalance: number;
+  projects: number;
+  pages: number;
+  generations: number;
+  totalToppedUpIdr: number;
+  totalCreditsPurchased: number;
+  totalCreditsConsumed: number;
+};
+
+export type AdminUserPayment = {
+  orderId: string;
+  packageSlug: string;
+  amountIdr: number;
+  credits: number;
+  status: string;
+  createdAt: string;
+};
+
+export type AdminUserTransaction = {
+  id: string;
+  type: string;
+  amount: number;
+  balanceAfter: number;
+  description: string;
+  status: string;
+  createdAt: string;
+};
+
 export type AdminBillingSummary = {
   totalBalance: number;
   creditsUsed: number;
@@ -93,6 +130,18 @@ export const adminService = {
   updateUser: (id: string, patch: AdminUserUpdate) =>
     http.patch<AdminUser>(`/admin/users/${id}`, patch),
   deleteUser: (id: string) => http.delete<{ success: boolean }>(`/admin/users/${id}`),
+
+  // Per-user 360° view
+  getUserOverview: (id: string) =>
+    http.get<AdminUserOverview>(`/admin/users/${id}/overview`),
+  getUserPayments: (id: string) =>
+    http.get<AdminUserPayment[]>(`/admin/users/${id}/payments`),
+  getUserTransactions: (id: string) =>
+    http.get<AdminUserTransaction[]>(`/admin/users/${id}/transactions`),
+  getUserGenerations: (id: string) =>
+    http.get<GenerationJob[]>(`/admin/users/${id}/generations`),
+  getUserProjects: (id: string) =>
+    http.get<AdminProject[]>(`/admin/users/${id}/projects`),
 
   // Projects
   listProjects: () => http.get<AdminProject[]>("/admin/projects"),

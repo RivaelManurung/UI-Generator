@@ -92,59 +92,6 @@ func (q *Queries) CreateGenerationJob(ctx context.Context, arg CreateGenerationJ
 	return i, err
 }
 
-const getGenerationJobByRequestID = `-- name: GetGenerationJobByRequestID :one
-SELECT id, user_id, project_id, page_id, request_id, status, prompt, page_type, domain, theme_slug, output_mode, credit_cost, error_message, retry_count, started_at, finished_at, created_at, updated_at
-FROM generation_jobs
-WHERE request_id = $1
-`
-
-type GetGenerationJobByRequestIDRow struct {
-	ID           pgtype.UUID
-	UserID       pgtype.UUID
-	ProjectID    pgtype.UUID
-	PageID       pgtype.UUID
-	RequestID    string
-	Status       string
-	Prompt       string
-	PageType     string
-	Domain       string
-	ThemeSlug    string
-	OutputMode   string
-	CreditCost   int32
-	ErrorMessage pgtype.Text
-	RetryCount   int32
-	StartedAt    pgtype.Timestamptz
-	FinishedAt   pgtype.Timestamptz
-	CreatedAt    pgtype.Timestamptz
-	UpdatedAt    pgtype.Timestamptz
-}
-
-func (q *Queries) GetGenerationJobByRequestID(ctx context.Context, requestID string) (GetGenerationJobByRequestIDRow, error) {
-	row := q.db.QueryRow(ctx, getGenerationJobByRequestID, requestID)
-	var i GetGenerationJobByRequestIDRow
-	err := row.Scan(
-		&i.ID,
-		&i.UserID,
-		&i.ProjectID,
-		&i.PageID,
-		&i.RequestID,
-		&i.Status,
-		&i.Prompt,
-		&i.PageType,
-		&i.Domain,
-		&i.ThemeSlug,
-		&i.OutputMode,
-		&i.CreditCost,
-		&i.ErrorMessage,
-		&i.RetryCount,
-		&i.StartedAt,
-		&i.FinishedAt,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
 const getOwnedGenerationJob = `-- name: GetOwnedGenerationJob :one
 SELECT id, user_id, project_id, page_id, request_id, status, prompt, page_type, domain, theme_slug, output_mode, credit_cost, error_message, retry_count, started_at, finished_at, created_at, updated_at
 FROM generation_jobs

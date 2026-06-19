@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { MoreHorizontal, Palette, Plus } from "lucide-react";
 import { toast } from "sonner";
@@ -24,29 +25,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Reveal, RevealGroup, RevealItem } from "@/components/ui/reveal";
 import { SectionCard, SectionCardHeader } from "@/components/ui/section-card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { adminService, THEME_LIBRARIES } from "@/lib/services/admin-service";
-import type {
-  AdminTheme,
-  AdminThemeInput,
-  ThemeLibrary,
-} from "@/lib/services/admin-service";
-
-const DEFAULT_ACCENT = "#334eac";
-const DEFAULT_LIBRARY: ThemeLibrary = "shadcn";
+import type { AdminTheme, ThemeLibrary } from "@/lib/services/admin-service";
 
 const PAGE_SIZE = 10;
 
@@ -54,32 +39,9 @@ function libraryLabel(library: ThemeLibrary): string {
   return THEME_LIBRARIES.find((item) => item.value === library)?.label ?? library;
 }
 
-type FormState = {
-  slug: string;
-  name: string;
-  accent: string;
-  library: ThemeLibrary;
-  description: string;
-};
-
-function emptyForm(): FormState {
-  return {
-    slug: "",
-    name: "",
-    accent: DEFAULT_ACCENT,
-    library: DEFAULT_LIBRARY,
-    description: "",
-  };
-}
-
 export default function AdminThemesPage() {
   const [themes, setThemes] = useState<AdminTheme[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState<AdminTheme | null>(null);
-  const [form, setForm] = useState<FormState>(emptyForm());
-  const [saving, setSaving] = useState(false);
 
   const [deleteTarget, setDeleteTarget] = useState<AdminTheme | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -158,62 +120,6 @@ export default function AdminThemesPage() {
     }
   }
 
-  function openCreate() {
-    setEditing(null);
-    setForm(emptyForm());
-    setFormOpen(true);
-  }
-
-  function openEdit(theme: AdminTheme) {
-    setEditing(theme);
-    setForm({
-      slug: theme.slug,
-      name: theme.name,
-      accent: theme.accent,
-      library: theme.library,
-      description: theme.description,
-    });
-    setFormOpen(true);
-  }
-
-  async function handleSubmit() {
-    if (!form.name.trim()) {
-      toast.error("Name is required");
-      return;
-    }
-    setSaving(true);
-    try {
-      if (editing) {
-        const input: AdminThemeInput = {
-          name: form.name.trim(),
-          accent: form.accent,
-          library: form.library,
-          description: form.description.trim(),
-        };
-        await adminService.updateTheme(editing.slug, input);
-        toast.success("Theme updated");
-      } else {
-        const input: AdminThemeInput = {
-          name: form.name.trim(),
-          accent: form.accent,
-          library: form.library,
-          description: form.description.trim(),
-        };
-        if (form.slug.trim()) {
-          input.slug = form.slug.trim();
-        }
-        await adminService.createTheme(input);
-        toast.success("Theme created");
-      }
-      setFormOpen(false);
-      await refetch();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      setSaving(false);
-    }
-  }
-
   async function handleDelete() {
     if (!deleteTarget) return;
     setDeleting(true);
@@ -235,9 +141,11 @@ export default function AdminThemesPage() {
       title="Themes"
       subtitle="Manage dashboard UI kits available to generated interfaces."
       actions={
-        <Button size="sm" onClick={openCreate}>
-          <Plus className="size-4" />
-          New theme
+        <Button size="sm" asChild>
+          <Link href="/admin/themes/new">
+            <Plus className="size-4" />
+            New theme
+          </Link>
         </Button>
       }
     >
@@ -312,9 +220,11 @@ export default function AdminThemesPage() {
                   Create your first UI kit to make it available to generated interfaces.
                 </p>
               </div>
-              <Button size="sm" onClick={openCreate}>
-                <Plus className="size-4" />
-                New theme
+              <Button size="sm" asChild>
+                <Link href="/admin/themes/new">
+                  <Plus className="size-4" />
+                  New theme
+                </Link>
               </Button>
             </div>
           ) : (
@@ -366,7 +276,9 @@ export default function AdminThemesPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => openEdit(theme)}>Edit</DropdownMenuItem>
+                            <DropdownMenuItem asChild>
+                              <Link href={`/admin/themes/${theme.slug}/edit`}>Edit</Link>
+                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               variant="destructive"
@@ -455,104 +367,6 @@ export default function AdminThemesPage() {
               disabled={bulkBusy}
             >
               {bulkBusy ? "Deleting..." : "Delete"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="font-semibold tracking-normal">
-              {editing ? "Edit theme" : "New theme"}
-            </DialogTitle>
-            <DialogDescription>
-              {editing
-                ? "Update the UI kit details."
-                : "Add a new dashboard UI kit."}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="theme-name">Name</Label>
-              <Input
-                id="theme-name"
-                value={form.name}
-                onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
-                placeholder="Planetary admin kit"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="theme-slug">Slug</Label>
-              <Input
-                id="theme-slug"
-                value={form.slug}
-                disabled={Boolean(editing)}
-                onChange={(event) => setForm((prev) => ({ ...prev, slug: event.target.value }))}
-                placeholder="auto from name"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="theme-library">Library</Label>
-              <Select
-                value={form.library}
-                onValueChange={(value) =>
-                  setForm((prev) => ({ ...prev, library: value as ThemeLibrary }))
-                }
-              >
-                <SelectTrigger id="theme-library">
-                  <SelectValue placeholder="Select a library" />
-                </SelectTrigger>
-                <SelectContent>
-                  {THEME_LIBRARIES.map((item) => (
-                    <SelectItem key={item.value} value={item.value}>
-                      {item.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="theme-accent">Accent</Label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="color"
-                  aria-label="Accent color picker"
-                  className="size-9 shrink-0 cursor-pointer rounded-md border border-border bg-transparent p-0.5"
-                  value={form.accent}
-                  onChange={(event) =>
-                    setForm((prev) => ({ ...prev, accent: event.target.value }))
-                  }
-                />
-                <Input
-                  id="theme-accent"
-                  className="font-mono"
-                  value={form.accent}
-                  onChange={(event) =>
-                    setForm((prev) => ({ ...prev, accent: event.target.value }))
-                  }
-                  placeholder={DEFAULT_ACCENT}
-                />
-              </div>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="theme-description">Description</Label>
-              <Textarea
-                id="theme-description"
-                value={form.description}
-                onChange={(event) =>
-                  setForm((prev) => ({ ...prev, description: event.target.value }))
-                }
-                placeholder="Dense data-table kit for operational dashboards."
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setFormOpen(false)} disabled={saving}>
-              Cancel
-            </Button>
-            <Button onClick={handleSubmit} disabled={saving}>
-              {saving ? "Saving..." : editing ? "Save changes" : "Create theme"}
             </Button>
           </DialogFooter>
         </DialogContent>

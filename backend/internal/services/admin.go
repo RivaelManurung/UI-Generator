@@ -2,17 +2,47 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"time"
 
 	"github.com/kreasinusantara/ui-generator-backend/internal/domain"
 	"github.com/kreasinusantara/ui-generator-backend/internal/platform/apperrors"
+	"github.com/kreasinusantara/ui-generator-backend/internal/repositories"
 )
 
 // errAdminNeedsDB is returned for admin mutations when running without a
 // database (mock mode). Admin CRUD is a database-backed, production feature.
 func errAdminNeedsDB() error {
 	return apperrors.Conflict("this admin operation requires a database-backed deployment")
+}
+
+// writeAudit records an admin mutation in the audit_logs table. The actorID is
+// the acting admin; resourceID is the affected user/resource. Audit logging must
+// never break the mutation it documents, so write failures are swallowed (the
+// underlying mutation has already succeeded and committed).
+func (f *FrontendService) writeAudit(ctx context.Context, actorID, action, resourceType, resourceID string, metadata map[string]interface{}) {
+	if f.s.auditLogs == nil {
+		return
+	}
+	auditID, err := newID()
+	if err != nil {
+		return
+	}
+	metaJSON := "{}"
+	if len(metadata) > 0 {
+		if b, err := json.Marshal(metadata); err == nil {
+			metaJSON = string(b)
+		}
+	}
+	_ = f.s.auditLogs.Create(ctx, repositories.AuditLog{
+		ID:           auditID,
+		UserID:       actorID,
+		Action:       action,
+		ResourceType: resourceType,
+		ResourceID:   resourceID,
+		MetadataJSON: metaJSON,
+	})
 }
 
 // ---- Users ----------------------------------------------------------------
@@ -23,7 +53,7 @@ type AdminUserUpdate struct {
 	Credits *int    `json:"credits"`
 }
 
-func (f *FrontendService) AdminUpdateUser(ctx context.Context, userID string, in AdminUserUpdate) (AdminUserDTO, error) {
+func (f *FrontendService) AdminUpdateUser(ctx context.Context, actorID, userID string, in AdminUserUpdate) (AdminUserDTO, error) {
 	if f.s.pool == nil {
 		return AdminUserDTO{}, errAdminNeedsDB()
 	}
@@ -32,9 +62,12 @@ func (f *FrontendService) AdminUpdateUser(ctx context.Context, userID string, in
 		if role != "user" && role != "admin" {
 			return AdminUserDTO{}, apperrors.Validation("role must be 'user' or 'admin'")
 		}
+		var before string
+		_ = f.s.pool.QueryRow(ctx, "SELECT COALESCE(role,'user') FROM users WHERE id=$1", userID).Scan(&before)
 		if _, err := f.s.pool.Exec(ctx, "UPDATE users SET role=$1, updated_at=now() WHERE id=$2", role, userID); err != nil {
 			return AdminUserDTO{}, err
 		}
+		f.writeAudit(ctx, actorID, "admin_user_role_change", "user", userID, map[string]interface{}{"before": before, "after": role})
 	}
 	if in.Status != nil {
 		status := strings.ToLower(strings.TrimSpace(*in.Status))
@@ -43,21 +76,26 @@ func (f *FrontendService) AdminUpdateUser(ctx context.Context, userID string, in
 		default:
 			return AdminUserDTO{}, apperrors.Validation("status must be active, review, or suspended")
 		}
+		var before string
+		_ = f.s.pool.QueryRow(ctx, "SELECT COALESCE(status,'active') FROM users WHERE id=$1", userID).Scan(&before)
 		if _, err := f.s.pool.Exec(ctx, "UPDATE users SET status=$1, updated_at=now() WHERE id=$2", status, userID); err != nil {
 			return AdminUserDTO{}, err
 		}
+		f.writeAudit(ctx, actorID, "admin_user_status_change", "user", userID, map[string]interface{}{"before": before, "after": status})
 	}
 	if in.Credits != nil {
 		credits := *in.Credits
 		if credits < 0 {
 			return AdminUserDTO{}, apperrors.Validation("credits cannot be negative")
 		}
+		var delta, before int
 		err := f.s.tx.WithTx(ctx, func(txCtx context.Context) error {
 			w, err := f.s.wallets.GetForUpdate(txCtx, userID)
 			if err != nil {
 				return err
 			}
-			delta := credits - w.Balance
+			before = w.Balance
+			delta = credits - w.Balance
 			w.Balance = credits
 			if err := f.s.wallets.Upsert(txCtx, w); err != nil {
 				return err
@@ -66,6 +104,10 @@ func (f *FrontendService) AdminUpdateUser(ctx context.Context, userID string, in
 			if err != nil {
 				return err
 			}
+			// The chk_credit_tx_reference constraint requires reference_type and
+			// reference_id to both be set or both be null. Point the reference at
+			// the affected user so the ledger row is traceable and the constraint
+			// is satisfied (previously reference_id was empty -> 23514 violation).
 			_, err = f.s.transactions.Create(txCtx, domain.CreditTransaction{
 				ID:            txID,
 				UserID:        userID,
@@ -73,6 +115,7 @@ func (f *FrontendService) AdminUpdateUser(ctx context.Context, userID string, in
 				Amount:        delta,
 				BalanceAfter:  credits,
 				ReferenceType: "admin",
+				ReferenceID:   userID,
 				Description:   "Admin credit adjustment",
 			})
 			return err
@@ -80,14 +123,17 @@ func (f *FrontendService) AdminUpdateUser(ctx context.Context, userID string, in
 		if err != nil {
 			return AdminUserDTO{}, err
 		}
+		f.writeAudit(ctx, actorID, "admin_credit_adjustment", "user", userID, map[string]interface{}{"before": before, "after": credits, "delta": delta})
 	}
 	return f.adminUserByID(ctx, userID)
 }
 
-func (f *FrontendService) AdminDeleteUser(ctx context.Context, userID string) error {
+func (f *FrontendService) AdminDeleteUser(ctx context.Context, actorID, userID string) error {
 	if f.s.pool == nil {
 		return errAdminNeedsDB()
 	}
+	var email string
+	_ = f.s.pool.QueryRow(ctx, "SELECT COALESCE(email,'') FROM users WHERE id=$1", userID).Scan(&email)
 	tag, err := f.s.pool.Exec(ctx, "DELETE FROM users WHERE id=$1", userID)
 	if err != nil {
 		return err
@@ -95,6 +141,7 @@ func (f *FrontendService) AdminDeleteUser(ctx context.Context, userID string) er
 	if tag.RowsAffected() == 0 {
 		return apperrors.NotFound("User not found.")
 	}
+	f.writeAudit(ctx, actorID, "admin_user_delete", "user", userID, map[string]interface{}{"email": email})
 	return nil
 }
 
@@ -170,10 +217,12 @@ func (f *FrontendService) AdminListProjects(ctx context.Context) ([]AdminProject
 	return out, rows.Err()
 }
 
-func (f *FrontendService) AdminDeleteProject(ctx context.Context, projectID string) error {
+func (f *FrontendService) AdminDeleteProject(ctx context.Context, actorID, projectID string) error {
 	if f.s.pool == nil {
 		return errAdminNeedsDB()
 	}
+	var ownerID, name string
+	_ = f.s.pool.QueryRow(ctx, "SELECT user_id::text, COALESCE(name,'') FROM projects WHERE id=$1", projectID).Scan(&ownerID, &name)
 	tag, err := f.s.pool.Exec(ctx, "UPDATE projects SET deleted_at=now() WHERE id=$1 AND deleted_at IS NULL", projectID)
 	if err != nil {
 		return err
@@ -181,6 +230,7 @@ func (f *FrontendService) AdminDeleteProject(ctx context.Context, projectID stri
 	if tag.RowsAffected() == 0 {
 		return apperrors.NotFound("Project not found.")
 	}
+	f.writeAudit(ctx, actorID, "admin_project_delete", "project", projectID, map[string]interface{}{"ownerId": ownerID, "name": name})
 	return nil
 }
 
@@ -402,14 +452,27 @@ func (f *FrontendService) AdminDeleteTheme(ctx context.Context, slug string) err
 // ---- Billing --------------------------------------------------------------
 
 type AdminBillingSummary struct {
+	// Credit-economy figures (existing — keep for the frontend).
 	TotalBalance  int `json:"totalBalance"`
 	CreditsUsed   int `json:"creditsUsed"`
 	RefundsIssued int `json:"refundsIssued"`
 	Topups        int `json:"topups"`
+	// Real-money (Midtrans) figures from the payments table.
+	TotalRevenueIDR int                 `json:"totalRevenueIdr"`
+	PaidOrders      int                 `json:"paidOrders"`
+	PackageSales    []AdminPackageSales `json:"packageSales"`
+}
+
+// AdminPackageSales is a per-package real-money sales breakdown.
+type AdminPackageSales struct {
+	PackageSlug string `json:"packageSlug"`
+	Orders      int    `json:"orders"`
+	RevenueIDR  int    `json:"revenueIdr"`
+	Credits     int    `json:"credits"`
 }
 
 func (f *FrontendService) AdminBillingSummary(ctx context.Context) (AdminBillingSummary, error) {
-	var s AdminBillingSummary
+	s := AdminBillingSummary{PackageSales: []AdminPackageSales{}}
 	if f.s.pool == nil {
 		return s, nil
 	}
@@ -417,6 +480,29 @@ func (f *FrontendService) AdminBillingSummary(ctx context.Context) (AdminBilling
 	_ = f.s.pool.QueryRow(ctx, "SELECT COALESCE(-SUM(amount),0) FROM credit_transactions WHERE amount<0").Scan(&s.CreditsUsed)
 	_ = f.s.pool.QueryRow(ctx, "SELECT COALESCE(SUM(amount),0) FROM credit_transactions WHERE type='refund'").Scan(&s.RefundsIssued)
 	_ = f.s.pool.QueryRow(ctx, "SELECT COALESCE(SUM(amount),0) FROM credit_transactions WHERE type='topup'").Scan(&s.Topups)
+
+	// Real-money revenue: a settled Midtrans top-up is normalized to status='paid'
+	// before storage (settlement/capture/accept all collapse to 'paid' in payment.go).
+	_ = f.s.pool.QueryRow(ctx,
+		"SELECT COALESCE(SUM(amount_idr),0), COUNT(*) FROM payments WHERE status='paid'").
+		Scan(&s.TotalRevenueIDR, &s.PaidOrders)
+
+	rows, err := f.s.pool.Query(ctx, `
+		SELECT package_slug, COUNT(*), COALESCE(SUM(amount_idr),0), COALESCE(SUM(credits),0)
+		FROM payments WHERE status='paid'
+		GROUP BY package_slug
+		ORDER BY SUM(amount_idr) DESC`)
+	if err != nil {
+		return s, nil
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var p AdminPackageSales
+		if err := rows.Scan(&p.PackageSlug, &p.Orders, &p.RevenueIDR, &p.Credits); err != nil {
+			return s, nil
+		}
+		s.PackageSales = append(s.PackageSales, p)
+	}
 	return s, nil
 }
 

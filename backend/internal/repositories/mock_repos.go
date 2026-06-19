@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/kreasinusantara/ui-generator-backend/internal/domain"
+	"github.com/kreasinusantara/ui-generator-backend/internal/platform/apperrors"
 	"github.com/kreasinusantara/ui-generator-backend/internal/platform/metrics"
 )
 
@@ -187,8 +188,10 @@ func (r *MockProjectRepository) SoftDeleteOwned(ctx context.Context, userID stri
 	p, ok := r.projects[projectID]
 	if ok && p.UserID == userID {
 		delete(r.projects, projectID)
+		return nil
 	}
-	return nil
+	// Mirror the Postgres repo: deleting a non-owned / non-existent project is a 404.
+	return apperrors.NotFound("Project not found or you do not have access.")
 }
 
 type MockPageRepository struct {
@@ -324,17 +327,6 @@ func (r *MockGenerationJobRepository) Create(ctx context.Context, job domain.Gen
 	r.jobs[job.ID] = job
 	metrics.IncJobStatus(job.Status)
 	return job, nil
-}
-
-func (r *MockGenerationJobRepository) FindByRequestID(ctx context.Context, requestID string) (domain.GenerationJob, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	for _, j := range r.jobs {
-		if j.RequestID == requestID {
-			return j, nil
-		}
-	}
-	return domain.GenerationJob{}, errors.New("job not found")
 }
 
 func (r *MockGenerationJobRepository) FindOwned(ctx context.Context, userID string, jobID string) (domain.GenerationJob, error) {

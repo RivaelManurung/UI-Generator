@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   ChevronLeft,
   ChevronRight,
+  Eye,
   Loader2,
   MoreHorizontal,
   RefreshCw,
@@ -40,7 +42,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -130,12 +131,6 @@ export default function AdminUsersPage() {
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<"all" | Role>("all");
   const [statusFilter, setStatusFilter] = useState<"all" | Status>("all");
-
-  const [editing, setEditing] = useState<AdminUser | null>(null);
-  const [editRole, setEditRole] = useState<Role>("user");
-  const [editStatus, setEditStatus] = useState<Status>("active");
-  const [editCredits, setEditCredits] = useState("0");
-  const [saving, setSaving] = useState(false);
 
   const [deleting, setDeleting] = useState<AdminUser | null>(null);
   const [removing, setRemoving] = useState(false);
@@ -244,32 +239,6 @@ export default function AdminUsersPage() {
       await load();
     } finally {
       setBulkBusy(false);
-    }
-  }
-
-  function openEdit(user: AdminUser) {
-    setEditing(user);
-    setEditRole(user.role === "admin" ? "admin" : "user");
-    setEditStatus(user.status);
-    setEditCredits(String(user.credits));
-  }
-
-  async function handleSave() {
-    if (!editing) return;
-    setSaving(true);
-    try {
-      await adminService.updateUser(editing.id, {
-        role: editRole,
-        status: editStatus,
-        credits: Number(editCredits) || 0,
-      });
-      toast.success("User updated");
-      setEditing(null);
-      await load();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      setSaving(false);
     }
   }
 
@@ -474,17 +443,23 @@ export default function AdminUsersPage() {
                         />
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-3">
+                        <Link
+                          href={`/admin/users/${user.id}`}
+                          className="flex items-center gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-planetary/40"
+                          aria-label={`View ${user.name}`}
+                        >
                           <Avatar className="size-8 shrink-0">
                             <AvatarFallback className="bg-sky/60 text-xs font-semibold text-planetary transition-colors group-hover:bg-planetary group-hover:text-white">
                               {initials(user.name)}
                             </AvatarFallback>
                           </Avatar>
                           <div className="min-w-0">
-                            <p className="truncate font-medium text-foreground">{user.name}</p>
+                            <p className="truncate font-medium text-foreground transition-colors group-hover:text-planetary">
+                              {user.name}
+                            </p>
                             <p className="truncate text-xs text-muted-foreground">{user.email}</p>
                           </div>
-                        </div>
+                        </Link>
                       </TableCell>
                       <TableCell>{roleBadge(user.role)}</TableCell>
                       <TableCell>{statusBadge(user.status)}</TableCell>
@@ -511,9 +486,17 @@ export default function AdminUsersPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onSelect={() => openEdit(user)}>
-                              <UserCog className="h-4 w-4" />
-                              Edit
+                            <DropdownMenuItem asChild>
+                              <Link href={`/admin/users/${user.id}`}>
+                                <Eye className="h-4 w-4" />
+                                View detail
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild>
+                              <Link href={`/admin/users/${user.id}/edit`}>
+                                <UserCog className="h-4 w-4" />
+                                Edit
+                              </Link>
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               variant="destructive"
@@ -592,60 +575,6 @@ export default function AdminUsersPage() {
                 <Trash2 className="h-4 w-4" />
               )}
               Delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={editing !== null} onOpenChange={(open) => (!open ? setEditing(null) : null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="tracking-normal">Edit user</DialogTitle>
-            <DialogDescription>{editing?.email}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="user-role">Role</Label>
-              <Select value={editRole} onValueChange={(value) => setEditRole(value as Role)}>
-                <SelectTrigger id="user-role" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="user">User</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="user-status">Status</Label>
-              <Select value={editStatus} onValueChange={(value) => setEditStatus(value as Status)}>
-                <SelectTrigger id="user-status" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="review">Review</SelectItem>
-                  <SelectItem value="suspended">Suspended</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="user-credits">Credits</Label>
-              <Input
-                id="user-credits"
-                type="number"
-                value={editCredits}
-                onChange={(event) => setEditCredits(event.target.value)}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditing(null)} disabled={saving}>
-              Cancel
-            </Button>
-            <Button onClick={() => void handleSave()} disabled={saving}>
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              Save changes
             </Button>
           </DialogFooter>
         </DialogContent>

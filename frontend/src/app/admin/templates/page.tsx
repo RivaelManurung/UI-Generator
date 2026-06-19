@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Crown, LayoutTemplate, Loader2, MoreHorizontal, Plus, Sparkles } from "lucide-react";
 import { toast } from "sonner";
@@ -26,15 +27,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -44,73 +36,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Textarea } from "@/components/ui/textarea";
 import { adminService } from "@/lib/services/admin-service";
-import type { AdminTemplate, AdminTemplateInput } from "@/lib/services/admin-service";
-
-const DOMAINS = [
-  "custom",
-  "hospital",
-  "finance",
-  "inventory",
-  "education",
-  "government",
-  "crm",
-  "pos",
-  "hr",
-];
-
-const PAGE_TYPES = ["dashboard", "list", "form", "detail", "login", "analytics"];
+import type { AdminTemplate } from "@/lib/services/admin-service";
 
 const PAGE_SIZE = 10;
-
-type FormState = {
-  id: string;
-  name: string;
-  domain: string;
-  pageType: string;
-  componentHint: string;
-  tier: "Free" | "Premium";
-  description: string;
-};
-
-function emptyForm(): FormState {
-  return {
-    id: "",
-    name: "",
-    domain: "custom",
-    pageType: "dashboard",
-    componentHint: "0",
-    tier: "Free",
-    description: "",
-  };
-}
-
-function toInput(form: FormState, includeId: boolean): AdminTemplateInput {
-  const input: AdminTemplateInput = {
-    name: form.name.trim(),
-    domain: form.domain,
-    pageType: form.pageType,
-    componentHint: Number.isFinite(Number(form.componentHint))
-      ? Number(form.componentHint)
-      : 0,
-    tier: form.tier,
-    description: form.description.trim(),
-  };
-  if (includeId && form.id.trim()) {
-    input.id = form.id.trim();
-  }
-  return input;
-}
 
 export default function AdminTemplatesPage() {
   const [templates, setTemplates] = useState<AdminTemplate[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState<AdminTemplate | null>(null);
-  const [form, setForm] = useState<FormState>(emptyForm());
-  const [saving, setSaving] = useState(false);
 
   const [deleteTarget, setDeleteTarget] = useState<AdminTemplate | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -194,49 +127,6 @@ export default function AdminTemplatesPage() {
     }
   }
 
-  function openCreate() {
-    setEditing(null);
-    setForm(emptyForm());
-    setFormOpen(true);
-  }
-
-  function openEdit(template: AdminTemplate) {
-    setEditing(template);
-    setForm({
-      id: template.id,
-      name: template.name,
-      domain: template.domain,
-      pageType: template.pageType,
-      componentHint: String(template.componentHint),
-      tier: template.tier,
-      description: template.description,
-    });
-    setFormOpen(true);
-  }
-
-  async function handleSubmit() {
-    if (!form.name.trim()) {
-      toast.error("Name is required");
-      return;
-    }
-    setSaving(true);
-    try {
-      if (editing) {
-        await adminService.updateTemplate(editing.id, toInput(form, false));
-        toast.success("Template updated");
-      } else {
-        await adminService.createTemplate(toInput(form, true));
-        toast.success("Template created");
-      }
-      setFormOpen(false);
-      await refetch();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      setSaving(false);
-    }
-  }
-
   async function handleDelete() {
     if (!deleteTarget) return;
     setDeleting(true);
@@ -258,9 +148,11 @@ export default function AdminTemplatesPage() {
       title="Templates"
       subtitle="Manage the template catalog used to seed new projects."
       actions={
-        <Button size="sm" onClick={openCreate}>
-          <Plus className="size-4" />
-          New template
+        <Button asChild size="sm">
+          <Link href="/admin/templates/new">
+            <Plus className="size-4" />
+            New template
+          </Link>
         </Button>
       }
     >
@@ -347,9 +239,11 @@ export default function AdminTemplatesPage() {
                           Create your first template to seed new projects.
                         </p>
                       </div>
-                      <Button size="sm" onClick={openCreate}>
-                        <Plus className="size-4" />
-                        New template
+                      <Button asChild size="sm">
+                        <Link href="/admin/templates/new">
+                          <Plus className="size-4" />
+                          New template
+                        </Link>
                       </Button>
                     </div>
                   </TableCell>
@@ -365,9 +259,12 @@ export default function AdminTemplatesPage() {
                       />
                     </TableCell>
                     <TableCell className="font-semibold tracking-normal">
-                      <span className="transition-colors group-hover:text-planetary">
+                      <Link
+                        href={`/admin/templates/${template.id}/edit`}
+                        className="transition-colors group-hover:text-planetary"
+                      >
                         {template.name}
-                      </span>
+                      </Link>
                       <span className="block font-mono text-xs text-muted-foreground">
                         {template.id}
                       </span>
@@ -411,8 +308,10 @@ export default function AdminTemplatesPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openEdit(template)}>
-                            Edit
+                          <DropdownMenuItem asChild>
+                            <Link href={`/admin/templates/${template.id}/edit`}>
+                              Edit
+                            </Link>
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
@@ -481,129 +380,6 @@ export default function AdminTemplatesPage() {
             >
               {bulkBusy ? <Loader2 className="size-4 animate-spin" /> : null}
               {bulkBusy ? "Deleting..." : "Delete"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="font-semibold tracking-normal">
-              {editing ? "Edit template" : "New template"}
-            </DialogTitle>
-            <DialogDescription>
-              {editing
-                ? "Update the template metadata."
-                : "Add a new template to the catalog."}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="template-name">Name</Label>
-              <Input
-                id="template-name"
-                value={form.name}
-                onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
-                placeholder="Hospital operations dashboard"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="template-id">Slug / ID</Label>
-              <Input
-                id="template-id"
-                value={form.id}
-                disabled={Boolean(editing)}
-                onChange={(event) => setForm((prev) => ({ ...prev, id: event.target.value }))}
-                placeholder="auto from name"
-              />
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="grid gap-2">
-                <Label htmlFor="template-domain">Domain</Label>
-                <Select
-                  value={form.domain}
-                  onValueChange={(value) => setForm((prev) => ({ ...prev, domain: value }))}
-                >
-                  <SelectTrigger id="template-domain">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DOMAINS.map((domain) => (
-                      <SelectItem key={domain} value={domain}>
-                        {domain}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="template-page-type">Page type</Label>
-                <Select
-                  value={form.pageType}
-                  onValueChange={(value) => setForm((prev) => ({ ...prev, pageType: value }))}
-                >
-                  <SelectTrigger id="template-page-type">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PAGE_TYPES.map((pageType) => (
-                      <SelectItem key={pageType} value={pageType}>
-                        {pageType}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="template-components">Components</Label>
-                <Input
-                  id="template-components"
-                  type="number"
-                  min={0}
-                  value={form.componentHint}
-                  onChange={(event) =>
-                    setForm((prev) => ({ ...prev, componentHint: event.target.value }))
-                  }
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="template-tier">Tier</Label>
-                <Select
-                  value={form.tier}
-                  onValueChange={(value) =>
-                    setForm((prev) => ({ ...prev, tier: value as "Free" | "Premium" }))
-                  }
-                >
-                  <SelectTrigger id="template-tier">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Free">Free</SelectItem>
-                    <SelectItem value="Premium">Premium</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="template-description">Description</Label>
-              <Textarea
-                id="template-description"
-                value={form.description}
-                onChange={(event) =>
-                  setForm((prev) => ({ ...prev, description: event.target.value }))
-                }
-                placeholder="Short summary of what this template produces."
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setFormOpen(false)} disabled={saving}>
-              Cancel
-            </Button>
-            <Button onClick={handleSubmit} disabled={saving}>
-              {saving ? <Loader2 className="size-4 animate-spin" /> : null}
-              {saving ? "Saving..." : editing ? "Save changes" : "Create template"}
             </Button>
           </DialogFooter>
         </DialogContent>

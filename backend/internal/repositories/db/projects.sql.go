@@ -156,9 +156,14 @@ type SoftDeleteOwnedProjectParams struct {
 	UserID pgtype.UUID
 }
 
-func (q *Queries) SoftDeleteOwnedProject(ctx context.Context, arg SoftDeleteOwnedProjectParams) error {
-	_, err := q.db.Exec(ctx, softDeleteOwnedProject, arg.ID, arg.UserID)
-	return err
+// SoftDeleteOwnedProject returns the number of rows affected so callers can
+// distinguish "nothing matched" (non-owned / non-existent) from a real delete.
+func (q *Queries) SoftDeleteOwnedProject(ctx context.Context, arg SoftDeleteOwnedProjectParams) (int64, error) {
+	tag, err := q.db.Exec(ctx, softDeleteOwnedProject, arg.ID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
 }
 
 const updateOwnedProject = `-- name: UpdateOwnedProject :one
