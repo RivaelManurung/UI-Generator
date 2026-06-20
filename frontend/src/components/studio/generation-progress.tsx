@@ -32,6 +32,7 @@ const KIND_NOUN: Record<LayoutKind, string> = {
   table: "data view",
   form: "form",
   generic: "layout",
+  mobile: "mobile app",
 };
 
 export function GenerationProgress({ prompt, completed, total, kind, failed }: GenerationProgressProps) {

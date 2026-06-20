@@ -10,7 +10,6 @@ import (
 	"github.com/kreasinusantara/ui-generator-backend/internal/domain"
 )
 
-
 func TestGenerateCreatesVersionAndConsumesCredit(t *testing.T) {
 	studio := NewStudioService()
 	ctx := context.Background()
@@ -69,7 +68,6 @@ func TestGenerateCreatesVersionAndConsumesCredit(t *testing.T) {
 		t.Fatal("expected generated TSX code")
 	}
 }
-
 
 func TestGenerateRequiresIdempotencyKey(t *testing.T) {
 	studio := NewStudioService()
@@ -194,7 +192,6 @@ func TestRefineCreatesNewVersionForSelectedSection(t *testing.T) {
 		t.Fatalf("expected refined dataset preset, got %v", chart["datasetPreset"])
 	}
 }
-
 
 func TestGenerateRejectsTooLongPrompt(t *testing.T) {
 	studio := NewStudioService()
@@ -419,4 +416,3 @@ func waitForJob(t *testing.T, studio *StudioService, userID, jobID string) domai
 	t.Fatal("timeout waiting for job " + jobID)
 	return domain.GenerationJob{}
 }
-

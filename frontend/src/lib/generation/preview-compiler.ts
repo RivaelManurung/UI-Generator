@@ -1176,6 +1176,240 @@ function renderTopNav(schema: PageSchema, opts: PreviewOptions): string {
     </header>`;
 }
 
+// A native-feel MOBILE app shell — chosen by the model via layout "mobile-app"
+// (set for projects whose platform is "mobile"). Single column, a compact top app
+// bar, and a fixed BOTTOM TAB BAR instead of a sidebar.
+function wantsMobile(schema: PageSchema): boolean {
+  return /mobile|app-shell|bottom-?nav/.test((schema.layout ?? "").toLowerCase());
+}
+
+const MOBILE_TAB_ICONS = ["home", "search", "bell", "user"];
+
+function renderMobileAppBar(schema: PageSchema, opts: PreviewOptions): string {
+  const brand = brandFor(schema, opts);
+  const initial = esc((brand.match(/[A-Za-z0-9]/)?.[0] ?? "D").toUpperCase());
+  return `
+    <header class="m-appbar">
+      <div class="m-brand"><span class="brand-mark">${initial}</span><span class="brand-text">${esc(brand)}</span></div>
+      <button class="m-icon" aria-label="Notifications"><span class="t-badge"></span>${icon("bell")}</button>
+    </header>`;
+}
+
+function renderMobileTabBar(schema: PageSchema): string {
+  const items = navItemsFor(schema).slice(0, 5);
+  const activeIdx = Math.max(0, Math.min(activeNavIndex(items, schema), items.length - 1));
+  const tabs = items
+    .map((it, i) => {
+      const ic = it.icon && it.icon !== it.label ? it.icon : MOBILE_TAB_ICONS[i] ?? "home";
+      const label = esc(it.label.split(" ")[0] ?? it.label);
+      return `<a class="m-tab ${i === activeIdx ? "active" : ""}"><span class="m-tab-ico">${icon(ic)}</span><span class="m-tab-label">${label}</span></a>`;
+    })
+    .join("");
+  return `<nav class="m-tabbar" aria-label="Primary">${tabs}</nav>`;
+}
+
+// ---- Native mobile section renderers -------------------------------------
+// On mobile the desktop section vocabulary is reshaped into app patterns: KPI
+// grids become a horizontal metric scroller, data tables become tappable list
+// rows, filter toolbars become a pill scroller. Everything else stacks as-is.
+const M_CHEVRON =
+  '<svg class="m-chev-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>';
+
+function mobileStatusBar(): string {
+  return `<div class="m-statusbar"><span class="m-sb-time">9:41</span><span class="m-sb-glyphs">${icon("activity")}${icon("globe")}${icon("zap")}</span></div>`;
+}
+
+function renderMobileMetrics(section: SchemaSection): string {
+  const items = section.items ?? [];
+  if (!items.length) return renderStatsGrid(section);
+  const cards = items
+    .map((item, i) => {
+      const numeric = parseNum(item.value);
+      return `
+      <article class="m-metric${i === 0 ? " m-metric--hero" : ""}" data-countup="${Number.isFinite(numeric) ? esc(item.value) : ""}">
+        <span class="m-metric-ico">${icon(item.icon || item.label)}</span>
+        <strong class="stat-value m-metric-val">${esc(item.value)}</strong>
+        <span class="m-metric-label">${esc(item.label)}</span>
+        ${trendHtml(item.trend)}
+      </article>`;
+    })
+    .join("");
+  return `<section class="block">${section.title ? `<h2 class="block-title">${esc(section.title)}</h2>` : ""}<div class="m-metrics">${cards}</div></section>`;
+}
+
+function renderMobileList(section: SchemaSection): string {
+  const columns = section.columns ?? [];
+  const rows = section.rows ?? [];
+  const title = esc(section.title ?? "List");
+  if (!rows.length) {
+    return `<section class="block card pad0"><h2 class="block-title table-title">${title}</h2><div class="m-list"><div class="m-row"><span class="m-row-main"><span class="m-row-sub">No records yet</span></span></div></div></section>`;
+  }
+  const statusIdx = columns.findIndex((c) => /status|state|kondisi/i.test(c));
+  const rowsHtml = rows
+    .slice(0, 8)
+    .map((row) => {
+      const rowTitle = esc(String(row[0] ?? ""));
+      const sub = row.length > 1 && statusIdx !== 1 ? esc(String(row[1] ?? "")) : "";
+      const metaRaw = statusIdx >= 0 ? String(row[statusIdx] ?? "") : String(row[row.length - 1] ?? "");
+      const cls = statusClass(metaRaw);
+      const meta =
+        cls && metaRaw.length <= 24
+          ? `<span class="badge ${cls}">${esc(metaRaw)}</span>`
+          : `<span class="m-row-meta">${esc(metaRaw)}</span>`;
+      return `<a class="m-row"><span class="m-row-avatar">${esc((rowTitle.match(/[A-Za-z0-9]/)?.[0] ?? "•").toUpperCase())}</span><span class="m-row-main"><span class="m-row-title">${rowTitle}</span>${sub ? `<span class="m-row-sub">${sub}</span>` : ""}</span>${meta}<span class="m-row-chev">${M_CHEVRON}</span></a>`;
+    })
+    .join("");
+  return `<section class="block card pad0"><h2 class="block-title table-title">${title}</h2><div class="m-list">${rowsHtml}</div></section>`;
+}
+
+function renderMobileChips(section: SchemaSection): string {
+  const filters = section.filters ?? [];
+  if (!filters.length) return "";
+  const chips = filters
+    .map((f, i) => `<span class="m-seg${i === 0 ? " active" : ""}">${esc(f)}</span>`)
+    .join("");
+  return `<section class="m-seg-row">${chips}</section>`;
+}
+
+// Dispatch a section to its mobile-native renderer, falling back to the shared
+// renderer for image/feature/content sections that already read well stacked.
+function renderMobileSection(section: SchemaSection): string {
+  switch (section.type) {
+    case "dataTable":
+      return renderMobileList(section);
+    case "statsGrid":
+      return renderMobileMetrics(section);
+    case "filterToolbar":
+      return renderMobileChips(section);
+    default:
+      return renderSection(section);
+  }
+}
+
+// A native phone sign-in / sign-up / reset screen: full-bleed, top-aligned,
+// full-width inputs, a pinned primary button and a single stacked social button
+// — NOT the centered desktop auth card.
+function renderMobileAuth(schema: PageSchema, opts: PreviewOptions): string {
+  const variant = authVariant((schema.pageType ?? "").toLowerCase());
+  const section =
+    (schema.sections ?? []).find((s) => s.type === "authForm") ??
+    (schema.sections ?? []).find((s) => s.type === "formSection") ??
+    ({ type: "authForm", title: schema.title } as SchemaSection);
+  const copy = AUTH_COPY[variant];
+  const brand = brandFor(schema, opts);
+  const initial = esc((brand.match(/[A-Za-z0-9]/)?.[0] ?? "D").toUpperCase());
+  const fields = section.fields && section.fields.length ? section.fields : AUTH_FIELDS[variant];
+  const inputs = fields
+    .map((f) => {
+      const isPwd = /password/i.test(`${f.type ?? ""} ${f.label ?? ""}`);
+      const inner = isPwd
+        ? `<span class="maf-input-wrap"><input class="maf-input" type="password" placeholder="${esc(f.hint ?? f.label ?? "")}" data-pwd /><button type="button" class="maf-eye" aria-label="Show password" data-toggle-pwd>${icon("eye")}</button></span>`
+        : `<input class="maf-input" type="${esc(f.type || "text")}" placeholder="${esc(f.hint ?? f.label ?? "")}" />`;
+      return `<label class="maf-field"><span class="maf-label">${esc(f.label)}</span>${inner}</label>`;
+    })
+    .join("");
+  const title = esc(section.title ?? copy.title);
+  const sub = esc(section.subtitle ?? copy.sub);
+  const cta = esc(section.primaryAction ?? section.submitLabel ?? copy.cta);
+  const foot = (section.actions ?? [])[1] ? esc((section.actions ?? [])[1]) : copy.foot;
+  const forgot =
+    variant === "login"
+      ? `<a class="maf-forgot" href="#">${esc((section.actions ?? [])[0] || "Forgot password?")}</a>`
+      : "";
+  const social =
+    variant === "forgot"
+      ? ""
+      : `<button class="maf-social" type="button">${GOOGLE_SVG}<span>Continue with Google</span></button>`;
+  return `<div class="m-wrap maf-wrap">
+    ${mobileStatusBar()}
+    <main class="maf-main">
+      <div class="maf-brand">${initial}</div>
+      <h1 class="maf-title">${title}</h1>
+      <p class="maf-sub">${sub}</p>
+      <form class="maf-form" onsubmit="return false">
+        ${inputs}
+        ${forgot}
+        <button class="primary maf-submit" type="submit">${cta}</button>
+        ${social}
+      </form>
+      <p class="maf-foot">${foot}</p>
+    </main>
+  </div>`;
+}
+
+// Stitch-style code-gen: the model returned a full self-contained screen as
+// HTML (with its own scoped <style>). We wrap it in a minimal document — theme
+// tokens + font + a one-shot "live reveal" animation that staggers the screen's
+// top-level cards in, mimicking Stitch's build-in feel — and render it raw in
+// the sandboxed iframe (allow-scripts, no same-origin → fully isolated).
+function renderCodeGenScreen(html: string, opts: PreviewOptions): string {
+  const ds = opts.designSystem ?? DEFAULT_DESIGN_SYSTEM;
+  const vars = rootVars(ds.tokens);
+  const stagger = Array.from({ length: 14 })
+    .map((_, i) => `.screen>*:nth-child(${i + 1}){animation-delay:${i * 65}ms}`)
+    .join("");
+  return `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+${fontLinkTag(ds.fontUrl)}
+<style>
+*{box-sizing:border-box}
+:root{${vars}}
+html,body{margin:0;padding:0;background:var(--content-bg,#f2f2f7);color:var(--fg,#1c1c1e);font-family:var(--font,-apple-system,system-ui,sans-serif);-webkit-font-smoothing:antialiased}
+.screen{width:100%;min-height:100vh;overflow-x:hidden}
+img{max-width:100%}
+@media (prefers-reduced-motion:no-preference){
+  .screen>*{animation:cg-reveal .5s cubic-bezier(.16,1,.3,1) both}
+  ${stagger}
+}
+@keyframes cg-reveal{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+</style>
+</head>
+<body>${html}</body>
+</html>`;
+}
+
+// A STABLE shell document for the live streaming preview: it is set once as the
+// iframe srcDoc (so the iframe never reloads), and the parent posts the growing
+// HTML body into #cg-root via postMessage — giving a smooth, flicker-free
+// "building" effect with a blinking write-cursor that follows the content.
+export function codeGenStreamShell(opts: PreviewOptions = {}): string {
+  const ds = opts.designSystem ?? DEFAULT_DESIGN_SYSTEM;
+  const vars = rootVars(ds.tokens);
+  return `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+${fontLinkTag(ds.fontUrl)}
+<style>
+*{box-sizing:border-box}
+:root{${vars}}
+html,body{margin:0;padding:0;background:var(--content-bg,#f2f2f7);color:var(--fg,#1c1c1e);font-family:var(--font,-apple-system,system-ui,sans-serif);-webkit-font-smoothing:antialiased}
+#cg-root{width:100%;overflow-x:hidden}
+img{max-width:100%}
+#cg-cursor{display:block;height:18px;width:3px;margin:6px 16px 24px;background:var(--primary,#0a84ff);border-radius:2px;animation:cg-blink 1s steps(2,start) infinite}
+@keyframes cg-blink{50%{opacity:0}}
+</style>
+</head>
+<body>
+<div id="cg-root"></div>
+<div id="cg-cursor"></div>
+<script>
+window.addEventListener('message',function(e){
+  if(!e||!e.data||!e.data.__cgstream)return;
+  var r=document.getElementById('cg-root');
+  if(!r)return;
+  r.innerHTML=e.data.html||'';
+  try{window.scrollTo(0,document.body.scrollHeight);}catch(_){}
+});
+<\/script>
+</body>
+</html>`;
+}
+
 function renderSidebar(schema: PageSchema, opts: PreviewOptions): string {
   const brand = brandFor(schema, opts);
   const items = navItemsFor(schema);
@@ -1296,10 +1530,23 @@ const PREVIEW_JS = `<script>
 </script>`;
 
 export function renderPreview(schema: PageSchema, opts: PreviewOptions = {}): string {
-  const sections = `<div class="grid">${(schema.sections ?? [])
-    .map((s) => `<div class="cell" style="grid-column:span ${spanCols(s)}">${renderSection(s)}</div>`)
-    .join("")}</div>`;
+  // Code-gen screens (Stitch-style) carry their whole UI as raw HTML — render it
+  // directly instead of compiling the fixed section vocabulary.
+  if (schema.html && schema.html.trim()) {
+    return renderCodeGenScreen(schema.html, opts);
+  }
   const shell = wantsShell(schema);
+  const mobileTarget = wantsMobile(schema);
+  const mobile = shell && mobileTarget;
+  // On mobile every section stacks full-width and uses native renderers
+  // (list rows, metric scroller, segmented control); on web a 12-col grid.
+  const sections = mobile
+    ? `<div class="m-stack">${(schema.sections ?? [])
+        .map((s) => `<div class="m-cell">${renderMobileSection(s)}</div>`)
+        .join("")}</div>`
+    : `<div class="grid">${(schema.sections ?? [])
+        .map((s) => `<div class="cell" style="grid-column:span ${spanCols(s)}">${renderSection(s)}</div>`)
+        .join("")}</div>`;
   const ds = opts.designSystem ?? DEFAULT_DESIGN_SYSTEM;
   const vars = rootVars(ds.tokens);
   const subtitle = SUBTITLE[(schema.pageType ?? "").toLowerCase()] ?? schema.domain ?? "";
@@ -1315,14 +1562,36 @@ export function renderPreview(schema: PageSchema, opts: PreviewOptions = {}): st
     (schema.sections ?? []).find((s) => s.type === "authForm") ??
     (schema.sections ?? []).find((s) => s.type === "formSection");
   const authType = (schema.pageType ?? "").toLowerCase();
-  const isAuthPage =
-    !shell &&
-    (authType === "login" ||
-      authType === "register" ||
-      authType === "forgot" ||
-      (schema.sections ?? []).some((s) => s.type === "authForm"));
+  const hasAuthSection =
+    authType === "login" ||
+    authType === "register" ||
+    authType === "forgot" ||
+    (schema.sections ?? []).some((s) => s.type === "authForm");
+  const isAuthPage = !shell && hasAuthSection;
 
-  const body = shell && wantsTopNav(schema)
+  // A FAB for the page's primary create action (mobile pattern), if the brief
+  // implies one via a filterToolbar/actionFooter primaryAction.
+  const fabAction = (schema.sections ?? [])
+    .map((s) => s.primaryAction)
+    .find((a) => a && /create|new|add|invite|tambah|buat|post|upload/i.test(a));
+  const fab = mobile && fabAction ? `<button class="m-fab" aria-label="${esc(fabAction!)}">${icon("send")}<span>+</span></button>` : "";
+
+  const body = mobileTarget && hasAuthSection
+    ? renderMobileAuth(schema, opts)
+    : mobile
+    ? `<div class="m-wrap">
+    <div class="m-top">
+      ${mobileStatusBar()}
+      ${renderMobileAppBar(schema, opts)}
+    </div>
+    <main class="m-scroll">
+      <div class="m-head"><h1>${esc(schema.title)}</h1>${subtitle ? `<p>${esc(subtitle)}</p>` : ""}</div>
+      ${sections}
+    </main>
+    ${fab}
+    ${renderMobileTabBar(schema)}
+  </div>`
+    : shell && wantsTopNav(schema)
     ? `<div class="tn-wrap">
     ${renderTopNav(schema, opts)}
     <main class="tn-page">
@@ -1402,6 +1671,75 @@ body{margin:0;background:var(--content-bg);color:var(--fg);font-family:var(--fon
 .tn-actions{display:flex;align-items:center;gap:10px;flex-shrink:0}
 .tn-page{padding:28px 32px;display:flex;flex-direction:column;gap:22px;max-width:1280px;margin:0 auto;width:100%}
 @media(max-width:760px){.tn-page{padding:18px}.tn-bar{padding:12px 16px;gap:12px}}
+/* Mobile app shell: a phone screen with a status bar + app bar + bottom tab bar. */
+.m-wrap{display:flex;flex-direction:column;min-height:100vh;max-width:480px;margin:0 auto;width:100%;background:var(--content-bg);position:relative}
+.m-top{position:sticky;top:0;z-index:6;background:var(--topbar-bg)}
+.m-statusbar{display:flex;align-items:center;justify-content:space-between;padding:6px 18px 2px;font-size:12px;font-weight:700;color:var(--topbar-fg)}
+.m-sb-glyphs{display:flex;align-items:center;gap:5px}
+.m-sb-glyphs svg{width:14px;height:14px}
+.m-appbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 16px 14px;background:var(--topbar-bg);color:var(--topbar-fg);border-bottom:1px solid var(--topbar-border)}
+.m-brand{display:flex;align-items:center;gap:9px;font-weight:800;font-size:15px;min-width:0}
+.m-brand .brand-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.m-icon{position:relative;display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:999px;border:none;background:transparent;color:inherit;cursor:pointer}
+.m-scroll{flex:1;padding:16px 14px 92px;display:flex;flex-direction:column;gap:18px}
+.m-head h1{margin:0;font-size:24px;font-weight:800;line-height:1.15;letter-spacing:-0.01em}
+.m-head p{margin:4px 0 0;color:var(--muted-fg);font-size:13px}
+.m-stack{display:flex;flex-direction:column;gap:18px}
+.m-cell{width:100%;min-width:0}
+/* Metric scroller (statsGrid → horizontal chips) */
+.m-metrics{display:flex;gap:12px;overflow-x:auto;padding:2px 2px 6px;scrollbar-width:none}
+.m-metrics::-webkit-scrollbar{display:none}
+.m-metric{flex:0 0 auto;min-width:130px;display:flex;flex-direction:column;gap:4px;padding:14px;border-radius:var(--radius);background:var(--card);border:var(--border-width,1px) solid var(--border);box-shadow:var(--shadow)}
+.m-metric--hero{min-width:170px;background:var(--primary);color:var(--primary-fg);border-color:transparent}
+.m-metric--hero .m-metric-label,.m-metric--hero .m-metric-ico{color:var(--primary-fg);opacity:.85}
+.m-metric-ico{display:flex}.m-metric-ico svg{width:18px;height:18px}
+.m-metric-val{font-size:22px;font-weight:800;line-height:1}
+.m-metric-label{font-size:12px;color:var(--muted-fg);font-weight:600}
+/* List rows (dataTable → tappable rows) */
+.m-list{display:flex;flex-direction:column}
+.m-row{display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--border);text-decoration:none;color:var(--fg);cursor:pointer}
+.m-row:last-child{border-bottom:none}
+.m-row:active{background:var(--muted)}
+.m-row-avatar{flex:0 0 auto;width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:var(--accent);color:var(--accent-fg);font-weight:800;font-size:14px}
+.m-row-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.m-row-title{font-size:14px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.m-row-sub{font-size:12px;color:var(--muted-fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.m-row-meta{font-size:13px;font-weight:700;color:var(--fg)}
+.m-row-chev{display:flex;color:var(--muted-fg);flex:0 0 auto}
+/* Segmented control (filterToolbar → pills) */
+.m-seg-row{display:flex;gap:8px;overflow-x:auto;padding:2px;scrollbar-width:none}
+.m-seg-row::-webkit-scrollbar{display:none}
+.m-seg{flex:0 0 auto;padding:8px 16px;border-radius:999px;background:var(--muted);color:var(--muted-fg);font-size:13px;font-weight:700;white-space:nowrap}
+.m-seg.active{background:var(--primary);color:var(--primary-fg)}
+/* Floating action button */
+.m-fab{position:absolute;right:18px;bottom:84px;z-index:7;display:flex;align-items:center;justify-content:center;width:56px;height:56px;border-radius:18px;border:none;background:var(--primary);color:var(--primary-fg);box-shadow:0 10px 24px rgba(0,0,0,.22);cursor:pointer;font-size:22px;font-weight:300}
+.m-fab svg{display:none}
+/* Native mobile auth screen */
+.maf-wrap{background:var(--content-bg)}
+.maf-main{flex:1;display:flex;flex-direction:column;padding:28px 24px 24px}
+.maf-brand{width:56px;height:56px;border-radius:18px;display:flex;align-items:center;justify-content:center;background:var(--brand-bg);color:var(--brand-fg);font-weight:800;font-size:22px;margin-bottom:22px}
+.maf-title{margin:0;font-size:28px;font-weight:800;letter-spacing:-0.02em;line-height:1.1}
+.maf-sub{margin:8px 0 24px;color:var(--muted-fg);font-size:14px;line-height:1.4}
+.maf-form{display:flex;flex-direction:column;gap:14px}
+.maf-field{display:flex;flex-direction:column;gap:6px}
+.maf-label{font-size:12px;font-weight:700;color:var(--muted-fg)}
+.maf-input,.maf-input-wrap{width:100%}
+.maf-input{padding:14px 16px;border-radius:14px;border:1px solid var(--border);background:var(--card);color:var(--fg);font-size:15px;font-family:inherit;outline:none}
+.maf-input:focus{border-color:var(--primary)}
+.maf-input-wrap{position:relative;display:flex;align-items:center}
+.maf-input-wrap .maf-input{padding-right:46px}
+.maf-eye{position:absolute;right:10px;display:flex;align-items:center;justify-content:center;width:30px;height:30px;border:none;background:transparent;color:var(--muted-fg);cursor:pointer}
+.maf-forgot{align-self:flex-end;font-size:13px;font-weight:700;color:var(--primary);text-decoration:none;margin-top:2px}
+.maf-submit{width:100%;padding:15px;border-radius:14px;font-size:16px;font-weight:800;margin-top:8px}
+.maf-social{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:14px;border-radius:14px;border:1px solid var(--border);background:var(--card);color:var(--fg);font-size:15px;font-weight:700;cursor:pointer;margin-top:4px}
+.maf-foot{margin-top:auto;padding-top:20px;text-align:center;font-size:14px;color:var(--muted-fg)}
+.maf-foot a{color:var(--primary);font-weight:700;text-decoration:none}
+.m-tabbar{position:sticky;bottom:0;display:flex;align-items:stretch;justify-content:space-around;gap:2px;padding:8px 6px calc(8px + env(safe-area-inset-bottom));background:var(--card);border-top:1px solid var(--border);z-index:6}
+.m-tab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;flex:1;padding:4px 2px;border-radius:var(--radius);color:var(--muted-fg);font-size:10px;font-weight:600;cursor:pointer;text-decoration:none}
+.m-tab-ico{display:flex}
+.m-tab-ico svg{width:20px;height:20px}
+.m-tab.active{color:var(--primary)}
+.m-tab.active .m-tab-ico{color:var(--primary)}
 .page{padding:28px 32px;display:flex;flex-direction:column;gap:22px}
 .page.solo{max-width:1180px;margin:0 auto;width:100%}
 .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:20px;align-items:start;grid-auto-flow:row dense}

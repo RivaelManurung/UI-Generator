@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"net/http"
-	"regexp"
 
 	"github.com/gin-gonic/gin"
 	"github.com/kreasinusantara/ui-generator-backend/internal/designsystem"
@@ -11,12 +10,6 @@ import (
 	"github.com/kreasinusantara/ui-generator-backend/internal/platform/apperrors"
 	"github.com/kreasinusantara/ui-generator-backend/internal/services"
 )
-
-var uuidRegex = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
-
-func isValidUUID(uuid string) bool {
-	return uuidRegex.MatchString(uuid)
-}
 
 type Handler struct {
 	studio        *services.StudioService
@@ -108,65 +101,6 @@ func (h *Handler) Me(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"user": user})
-}
-
-func (h *Handler) ListProjects(c *gin.Context) {
-	user := mustUser(c)
-	projects, err := h.studio.ListProjectsForUser(c.Request.Context(), user.ID)
-	if err != nil {
-		writeServiceError(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"projects": projects})
-}
-
-func (h *Handler) CreateProject(c *gin.Context) {
-	var input services.CreateProjectInput
-	if err := c.ShouldBindJSON(&input); err != nil {
-		writeError(c, apperrors.BadRequest("invalid JSON body"))
-		return
-	}
-	user := mustUser(c)
-	project, err := h.studio.CreateProjectForUser(c.Request.Context(), user.ID, input)
-	if err != nil {
-		writeServiceError(c, err)
-		return
-	}
-	c.JSON(http.StatusCreated, gin.H{"project": project})
-}
-
-func (h *Handler) GetProject(c *gin.Context) {
-	user := mustUser(c)
-	project, pages, err := h.studio.GetProjectForUser(c.Request.Context(), user.ID, c.Param("id"))
-	if err != nil {
-		writeServiceError(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"project": project, "pages": pages})
-}
-
-func (h *Handler) UpdateProject(c *gin.Context) {
-	var input services.UpdateProjectInput
-	if err := c.ShouldBindJSON(&input); err != nil {
-		writeError(c, apperrors.BadRequest("invalid JSON body"))
-		return
-	}
-	user := mustUser(c)
-	project, err := h.studio.UpdateProjectForUser(c.Request.Context(), user.ID, c.Param("id"), input)
-	if err != nil {
-		writeServiceError(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"project": project})
-}
-
-func (h *Handler) DeleteProject(c *gin.Context) {
-	user := mustUser(c)
-	if err := h.studio.DeleteProjectForUser(c.Request.Context(), user.ID, c.Param("id")); err != nil {
-		writeServiceError(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
 func (h *Handler) ListProjectPages(c *gin.Context) {
@@ -268,7 +202,6 @@ func (h *Handler) RefinePage(c *gin.Context) {
 	})
 }
 
-
 func (h *Handler) ListVersions(c *gin.Context) {
 	user := mustUser(c)
 	versions, err := h.studio.ListVersionsForUser(c.Request.Context(), user.ID, c.Param("id"))
@@ -343,24 +276,6 @@ func (h *Handler) Templates(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"templates": templates})
-}
-
-func (h *Handler) AdminUsers(c *gin.Context) {
-	users, err := h.studio.AdminUsers(c.Request.Context())
-	if err != nil {
-		writeServiceError(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"users": users})
-}
-
-func (h *Handler) AdminGenerationJobs(c *gin.Context) {
-	jobs, err := h.studio.AdminGenerationJobs(c.Request.Context())
-	if err != nil {
-		writeServiceError(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"jobs": jobs})
 }
 
 func (h *Handler) AdminAuditLogs(c *gin.Context) {

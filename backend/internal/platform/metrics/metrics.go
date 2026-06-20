@@ -32,10 +32,6 @@ func IncAIFailure() {
 	atomic.AddUint64(&GlobalMetrics.AIFailures, 1)
 }
 
-func IncQueueRetry() {
-	atomic.AddUint64(&GlobalMetrics.QueueRetries, 1)
-}
-
 func IncJobStatus(status string) {
 	switch status {
 	case "queued":

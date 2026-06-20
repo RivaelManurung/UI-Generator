@@ -261,6 +261,7 @@ type TemplateDTO struct {
 	ComponentHint int    `json:"componentHint"`
 	Tier          string `json:"tier"`
 	Description   string `json:"description"`
+	Platform      string `json:"platform,omitempty"`
 }
 
 type TemplateInput struct {
@@ -271,6 +272,7 @@ type TemplateInput struct {
 	ComponentHint int    `json:"componentHint"`
 	Tier          string `json:"tier"`
 	Description   string `json:"description"`
+	Platform      string `json:"platform"`
 }
 
 func (f *FrontendService) AdminListTemplates(ctx context.Context) ([]TemplateDTO, error) {
@@ -298,9 +300,9 @@ func (f *FrontendService) AdminCreateTemplate(ctx context.Context, in TemplateIn
 	}
 	t := normalizeTemplate(in, id)
 	_, err := f.s.pool.Exec(ctx, `
-		INSERT INTO templates (id, name, domain, page_type, component_hint, tier, description, created_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7, now())`,
-		t.ID, t.Name, t.Domain, t.PageType, t.ComponentHint, t.Tier, t.Description)
+		INSERT INTO templates (id, name, domain, page_type, component_hint, tier, description, platform, created_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8, now())`,
+		t.ID, t.Name, t.Domain, t.PageType, t.ComponentHint, t.Tier, t.Description, t.Platform)
 	if err != nil {
 		return TemplateDTO{}, mapAdminWriteError(err, "template")
 	}
@@ -313,8 +315,8 @@ func (f *FrontendService) AdminUpdateTemplate(ctx context.Context, id string, in
 	}
 	t := normalizeTemplate(in, id)
 	tag, err := f.s.pool.Exec(ctx, `
-		UPDATE templates SET name=$2, domain=$3, page_type=$4, component_hint=$5, tier=$6, description=$7
-		WHERE id=$1`, id, t.Name, t.Domain, t.PageType, t.ComponentHint, t.Tier, t.Description)
+		UPDATE templates SET name=$2, domain=$3, page_type=$4, component_hint=$5, tier=$6, description=$7, platform=$8
+		WHERE id=$1`, id, t.Name, t.Domain, t.PageType, t.ComponentHint, t.Tier, t.Description, t.Platform)
 	if err != nil {
 		return TemplateDTO{}, err
 	}
@@ -359,6 +361,7 @@ func normalizeTemplate(in TemplateInput, id string) TemplateDTO {
 		ComponentHint: hint,
 		Tier:          tier,
 		Description:   strings.TrimSpace(in.Description),
+		Platform:      normalizePlatform(in.Platform),
 	}
 }
 

@@ -33,6 +33,7 @@ export type AdminTemplate = {
   componentHint: number;
   tier: "Free" | "Premium";
   description: string;
+  platform?: "web" | "mobile";
 };
 
 export type AdminTemplateInput = Omit<AdminTemplate, "id"> & { id?: string };

@@ -15,6 +15,8 @@ export interface DesignSystem {
   css?: string;
   /** Flat CSS custom-property values keyed WITHOUT the leading "--". */
   tokens: Record<string, string>;
+  /** Platforms this style is offered for ("web"/"mobile"). Empty = both. */
+  platforms?: string[];
 }
 
 // Bundled fallback so the preview renders a sane neutral look before the API
@@ -22,6 +24,7 @@ export interface DesignSystem {
 export const DEFAULT_DESIGN_SYSTEM: DesignSystem = {
   slug: "shadcn",
   name: "shadcn/ui",
+  platforms: ["web", "mobile"],
   fontUrl:
     "https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&display=swap",
   css: "",

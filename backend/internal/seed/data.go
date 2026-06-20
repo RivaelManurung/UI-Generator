@@ -87,11 +87,14 @@ func Studio() StudioData {
 			{Slug: "finance-sharp", Name: "Finance Sharp", Accent: "#0f766e"},
 		},
 		Templates: []domain.Template{
-			{ID: "hospital-dashboard", Name: "Hospital Operations", Domain: "hospital", PageType: "dashboard", ComponentHint: 10, Tier: "Free", Description: "Appointments, doctors, departments, and patient flow."},
-			{ID: "inventory-list", Name: "Inventory List", Domain: "inventory", PageType: "list", ComponentHint: 8, Tier: "Premium", Description: "SKU health, stock movement, and supplier alerts."},
-			{ID: "finance-analytics", Name: "Finance Analytics", Domain: "finance", PageType: "dashboard", ComponentHint: 9, Tier: "Premium", Description: "Revenue, invoices, accounts, and cash-flow analytics."},
-			{ID: "school-attendance", Name: "School Attendance", Domain: "education", PageType: "list", ComponentHint: 7, Tier: "Free", Description: "Attendance table, filters, and class-level summaries."},
-			{ID: "village-management", Name: "Village Management", Domain: "government", PageType: "dashboard", ComponentHint: 9, Tier: "Free", Description: "Citizen services, cases, budgets, and activity reports."},
+			{ID: "hospital-dashboard", Name: "Hospital Operations", Domain: "hospital", PageType: "dashboard", ComponentHint: 10, Tier: "Free", Description: "Appointments, doctors, departments, and patient flow.", Platform: "web"},
+			{ID: "inventory-list", Name: "Inventory List", Domain: "inventory", PageType: "list", ComponentHint: 8, Tier: "Premium", Description: "SKU health, stock movement, and supplier alerts.", Platform: "web"},
+			{ID: "finance-analytics", Name: "Finance Analytics", Domain: "finance", PageType: "dashboard", ComponentHint: 9, Tier: "Premium", Description: "Revenue, invoices, accounts, and cash-flow analytics.", Platform: "web"},
+			{ID: "school-attendance", Name: "School Attendance", Domain: "education", PageType: "list", ComponentHint: 7, Tier: "Free", Description: "Attendance table, filters, and class-level summaries.", Platform: "web"},
+			{ID: "village-management", Name: "Village Management", Domain: "government", PageType: "dashboard", ComponentHint: 9, Tier: "Free", Description: "Citizen services, cases, budgets, and activity reports.", Platform: "web"},
+			{ID: "food-delivery-app", Name: "Food Delivery App", Domain: "logistics", PageType: "dashboard", ComponentHint: 6, Tier: "Free", Description: "Active orders, rider earnings, and a live delivery map.", Platform: "mobile"},
+			{ID: "fitness-tracker-app", Name: "Fitness Tracker App", Domain: "health", PageType: "dashboard", ComponentHint: 6, Tier: "Free", Description: "Daily activity rings, workouts, and progress streaks.", Platform: "mobile"},
+			{ID: "mobile-banking-app", Name: "Mobile Banking App", Domain: "finance", PageType: "dashboard", ComponentHint: 7, Tier: "Premium", Description: "Balance, recent transactions, cards, and quick transfers.", Platform: "mobile"},
 		},
 	}
 }

@@ -24,10 +24,6 @@ export function getBypassSession(): AuthSession {
 
 const SESSION_KEY = "dashboardcraft_session";
 
-export function ensureBypassSession() {
-  // Client-side local storage bypass removed for security compliance
-}
-
 export function saveSession(session: AuthSession) {
   if (typeof window !== "undefined") {
     try {
@@ -87,25 +83,3 @@ export function getCurrentUser(): AuthUser | null {
   return null;
 }
 
-export async function readAuthResponse(response: Response) {
-  return response.json();
-}
-
-export async function authRequest<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = getAccessToken();
-  const headers = new Headers(init?.headers);
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
-
-  const res = await fetch(path, {
-    ...init,
-    headers,
-  });
-
-  if (!res.ok) {
-    throw new Error(`Auth request failed: ${res.statusText}`);
-  }
-
-  return res.json() as Promise<T>;
-}

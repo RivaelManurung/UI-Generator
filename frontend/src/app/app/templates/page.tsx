@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Blocks, CheckCircle2, Crown } from "lucide-react";
+import { Blocks, CheckCircle2, Crown, Monitor, Smartphone } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,29 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getTemplates, type Template } from "@/hooks/use-templates";
+
+// Turn a template into a ready-to-generate Studio handoff: a rich brief (>=40
+// chars so generation is enabled immediately) plus the project name + platform,
+// passed as query params the Studio reads on entry.
+function studioHrefForTemplate(template: Template): string {
+  const platform = template.platform === "mobile" ? "mobile" : "web";
+  const brief =
+    platform === "mobile"
+      ? `Build a ${template.domain} mobile app screen called "${template.name}". ${template.description} ` +
+        `Design it as a native phone app: a single-column layout, a bottom tab bar, and ` +
+        `around ${template.componentHint} touch-friendly sections with realistic ${template.domain} data.`
+      : `Build a ${template.domain} ${
+          template.pageType?.toLowerCase() === "list" ? "list/table view" : "dashboard"
+        } called "${template.name}". ${template.description} ` +
+        `Include around ${template.componentHint} components with realistic ${template.domain} data, ` +
+        `clear product-specific navigation, KPIs, and a production-ready layout.`;
+  const params = new URLSearchParams({
+    name: template.name,
+    platform,
+    prompt: brief,
+  });
+  return `/app/studio/demo?${params.toString()}`;
+}
 
 export default function AppTemplatesPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -93,17 +116,28 @@ function TemplateCard({ template }: { template: Template }) {
         <CardDescription>{template.description}</CardDescription>
       </CardHeader>
       <CardContent className="mt-auto">
-        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
           <span className="flex items-center gap-1.5">
             <Blocks className="h-3.5 w-3.5" />
             <span className="tabular-nums">{template.componentHint}</span> components
           </span>
           <span className="capitalize">{template.pageType}</span>
+          {template.platform === "mobile" ? (
+            <span className="flex items-center gap-1.5 font-semibold text-primary">
+              <Smartphone className="h-3.5 w-3.5" />
+              Mobile app
+            </span>
+          ) : (
+            <span className="flex items-center gap-1.5">
+              <Monitor className="h-3.5 w-3.5" />
+              Website
+            </span>
+          )}
         </div>
       </CardContent>
       <CardFooter>
         <Button asChild className="w-full">
-          <Link href="/app/studio/demo">Use template</Link>
+          <Link href={studioHrefForTemplate(template)}>Use template</Link>
         </Button>
       </CardFooter>
     </Card>

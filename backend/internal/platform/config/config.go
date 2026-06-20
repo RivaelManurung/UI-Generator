@@ -20,7 +20,6 @@ type Config struct {
 	AllowedCORSOrigins []string
 	Environment        string
 	AIProvider         string
-	GeminiAPIKey       string
 	OpenAIAPIKey       string
 	OpenAIBaseURL      string
 	OpenAIModel        string
@@ -32,7 +31,7 @@ type Config struct {
 func Load() Config {
 	_ = godotenv.Load(".env", "backend/.env")
 
-	provider := strings.ToLower(env("AI_PROVIDER", "gemini"))
+	provider := strings.ToLower(env("AI_PROVIDER", "mock"))
 
 	// OpenAI-compatible settings. Works with OpenAI, 9Router (a local gateway at
 	// http://localhost:20128/v1), CommandCode, OpenRouter, etc. Selecting a known
@@ -76,7 +75,6 @@ func Load() Config {
 		AllowedCORSOrigins: csvEnv("CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"),
 		Environment:        env("APP_ENV", "development"),
 		AIProvider:         provider,
-		GeminiAPIKey:       os.Getenv("GEMINI_API_KEY"),
 		OpenAIAPIKey:       openAIKey,
 		OpenAIBaseURL:      openAIBase,
 		OpenAIModel:        openAIModel,
@@ -118,9 +116,6 @@ func (c Config) Validate() error {
 			return errors.New("mock AI provider is forbidden in production")
 		}
 		// production must check provider key
-		if strings.EqualFold(c.AIProvider, "gemini") && c.GeminiAPIKey == "" {
-			return errors.New("GEMINI_API_KEY is required in production when AI_PROVIDER is gemini")
-		}
 		if isOpenAICompatible(c.AIProvider) && c.OpenAIAPIKey == "" {
 			return errors.New("OPENAI_API_KEY (or COMMANDCODE_API_KEY) is required in production for this AI_PROVIDER")
 		}
@@ -128,9 +123,6 @@ func (c Config) Validate() error {
 		// In local dev, mock is allowed, but other providers must be configured if chosen
 		if isOpenAICompatible(c.AIProvider) && c.OpenAIAPIKey == "" {
 			return errors.New("OPENAI_API_KEY (or COMMANDCODE_API_KEY) is required when AI_PROVIDER is openai/commandcode")
-		}
-		if strings.EqualFold(c.AIProvider, "gemini") && c.GeminiAPIKey == "" {
-			return errors.New("GEMINI_API_KEY is required when AI_PROVIDER is gemini")
 		}
 	}
 	if c.AccessTokenTTL <= 0 {

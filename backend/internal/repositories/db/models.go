@@ -159,6 +159,7 @@ type Project struct {
 	UpdatedAt        pgtype.Timestamptz
 	DeletedAt        pgtype.Timestamptz
 	Status           string
+	Platform         string
 }
 
 type ProjectPage struct {
@@ -192,6 +193,7 @@ type Template struct {
 	Tier          string
 	Description   string
 	CreatedAt     pgtype.Timestamptz
+	Platform      string
 }
 
 type Theme struct {

@@ -26,6 +26,9 @@ type DesignSystem struct {
 	FontURL     string            `json:"fontUrl"`
 	CSS         string            `json:"css"` // extra raw CSS appended after the skeleton (structural quirks)
 	Tokens      map[string]string `json:"tokens"`
+	// Platforms this style is offered for in the studio picker: "web", "mobile",
+	// or both. Empty = available for both (back-compat).
+	Platforms []string `json:"platforms,omitempty"`
 }
 
 var (

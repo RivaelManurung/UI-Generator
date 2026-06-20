@@ -10,15 +10,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/kreasinusantara/ui-generator-backend/internal/ai"
-	"github.com/kreasinusantara/ui-generator-backend/internal/designsystem"
 	"github.com/kreasinusantara/ui-generator-backend/internal/domain"
 	"github.com/kreasinusantara/ui-generator-backend/internal/platform/apperrors"
-	"github.com/kreasinusantara/ui-generator-backend/internal/renderer"
-	"github.com/kreasinusantara/ui-generator-backend/internal/schema"
 )
 
 // FrontendService adapts the StudioService (page-centric, PRD component-registry
@@ -46,6 +42,7 @@ type ProjectDTO struct {
 	Description      string  `json:"description"`
 	Status           string  `json:"status"`
 	DefaultThemeSlug string  `json:"defaultThemeSlug"`
+	Platform         string  `json:"platform"`
 	PagesCount       int     `json:"pagesCount"`
 	QualityAverage   float64 `json:"qualityAverage"`
 	UpdatedAt        string  `json:"updatedAt"`
@@ -57,6 +54,7 @@ type CreateProjectFEInput struct {
 	Description      string `json:"description"`
 	Status           string `json:"status"`
 	DefaultThemeSlug string `json:"defaultThemeSlug"`
+	Platform         string `json:"platform"`
 }
 
 type UpdateProjectFEInput struct {
@@ -191,6 +189,30 @@ func (f *FrontendService) ListProjects(ctx context.Context, userID string) ([]Pr
 	if err != nil {
 		return nil, err
 	}
+	// Batch-load status + platform for ALL of this user's projects in ONE query,
+	// instead of one round-trip per project inside projectDTO (was an N+1). The
+	// pre-loaded values are stamped onto each project so projectDTO skips its
+	// own per-row lookup.
+	if f.s.pool != nil {
+		type sp struct{ status, platform string }
+		meta := map[string]sp{}
+		rows, qerr := f.s.pool.Query(ctx, "SELECT id, status, platform FROM projects WHERE user_id=$1 AND deleted_at IS NULL", userID)
+		if qerr == nil {
+			for rows.Next() {
+				var id, st, pf string
+				if rows.Scan(&id, &st, &pf) == nil {
+					meta[id] = sp{status: st, platform: pf}
+				}
+			}
+			rows.Close()
+		}
+		for i := range projects {
+			if m, ok := meta[projects[i].ID]; ok {
+				projects[i].Status = m.status
+				projects[i].Platform = m.platform
+			}
+		}
+	}
 	out := make([]ProjectDTO, 0, len(projects))
 	for _, p := range projects {
 		out = append(out, f.projectDTO(ctx, userID, p))
@@ -217,15 +239,23 @@ func (f *FrontendService) CreateProject(ctx context.Context, userID string, in C
 	}
 
 	status := normalizeStatus(in.Status)
+	platform := normalizePlatform(in.Platform)
 	if f.s.pool != nil {
-		if _, err := f.s.pool.Exec(ctx, "UPDATE projects SET status=$1 WHERE id=$2", status, proj.ID); err != nil {
+		if _, err := f.s.pool.Exec(ctx, "UPDATE projects SET status=$1, platform=$2 WHERE id=$3", status, platform, proj.ID); err != nil {
 			return ProjectDTO{}, err
 		}
 	}
 	proj.Status = status
+	proj.Platform = platform
 
-	// Create a primary page so versions/generation work at the project level.
-	_, _ = f.s.CreatePageForUser(ctx, userID, proj.ID, CreatePageInput{Name: "Overview", PageType: "dashboard"})
+	// Seed the primary page to match the target: a mobile project opens on a
+	// "Home" screen, a website on the classic "Overview" dashboard. Either way the
+	// page TYPE stays "dashboard" so existing reuse-by-type generation still works.
+	primaryName := "Overview"
+	if platform == "mobile" {
+		primaryName = "Home"
+	}
+	_, _ = f.s.CreatePageForUser(ctx, userID, proj.ID, CreatePageInput{Name: primaryName, PageType: "dashboard"})
 
 	return f.projectDTO(ctx, userID, proj), nil
 }
@@ -285,10 +315,18 @@ func (f *FrontendService) projectDTO(ctx context.Context, userID string, p domai
 	}
 
 	status := normalizeStatus(p.Status)
-	if f.s.pool != nil {
-		var st string
-		if err := f.s.pool.QueryRow(ctx, "SELECT status FROM projects WHERE id=$1", p.ID).Scan(&st); err == nil && st != "" {
-			status = st
+	platform := normalizePlatform(p.Platform)
+	// Only hit the DB when the caller did NOT pre-load status/platform (e.g. the
+	// single-project GetProject path). ListProjects batch-loads them to avoid N+1.
+	if f.s.pool != nil && p.Status == "" {
+		var st, pf string
+		if err := f.s.pool.QueryRow(ctx, "SELECT status, platform FROM projects WHERE id=$1", p.ID).Scan(&st, &pf); err == nil {
+			if st != "" {
+				status = st
+			}
+			if pf != "" {
+				platform = normalizePlatform(pf)
+			}
 		}
 	}
 
@@ -298,6 +336,7 @@ func (f *FrontendService) projectDTO(ctx context.Context, userID string, p domai
 		Description:      p.Description,
 		Status:           status,
 		DefaultThemeSlug: p.DefaultThemeSlug,
+		Platform:         platform,
 		PagesCount:       len(pages),
 		QualityAverage:   round1(quality),
 		UpdatedAt:        isoTime(p.UpdatedAt),
@@ -688,101 +727,6 @@ func (f *FrontendService) resolveAppPlan(ctx context.Context, in GenerateAppInpu
 	return padPlan(base, in.PageCount)
 }
 
-// GenerateMultiPage generates several coherent pages (dashboard, list, detail,
-// form) for one project from a single prompt. Each page is a real project_page
-// with its own validated version + kit-rendered code.
-func (f *FrontendService) GenerateMultiPage(ctx context.Context, userID, projectID, idemKey string, in GenerateAppInput) ([]GeneratedPageDTO, error) {
-	_, err := f.s.projects.FindOwned(ctx, userID, projectID)
-	if err != nil {
-		return nil, apperrors.NotFound("Project not found or you do not have access.")
-	}
-	existing, _ := f.s.pages.ListByOwnedProject(ctx, userID, projectID)
-	bySlug := make(map[string]domain.Page, len(existing))
-	for _, p := range existing {
-		bySlug[p.Slug] = p
-	}
-
-	theme := f.normalizeTheme(ctx, in.ThemeSlug)
-
-	// Ensure a page exists for each planned screen (sequential, fast DB work).
-	type planned struct {
-		plan pagePlan
-		slug string
-		page domain.Page
-	}
-	items := make([]planned, 0, in.PageCount)
-	for _, pp := range f.resolveAppPlan(ctx, in, "") {
-		slug := slugify(pp.Name)
-		page, ok := bySlug[slug]
-		if !ok {
-			page, err = f.s.CreatePageForUser(ctx, userID, projectID, CreatePageInput{Name: pp.Name, PageType: pp.PageType})
-			if err != nil {
-				return nil, err
-			}
-			bySlug[slug] = page
-		}
-		items = append(items, planned{plan: pp, slug: slug, page: page})
-	}
-
-	// Detach generation from the request context so it finishes on the server
-	// even if the user navigates away mid-build. Finished pages are persisted and
-	// shown when they reopen the project.
-	genCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 175*time.Second)
-	defer cancel()
-
-	// Generate every page concurrently so total time ≈ the slowest page, not the sum.
-	results := make([]*GeneratedPageDTO, len(items))
-	var wg sync.WaitGroup
-	for i := range items {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
-			it := items[i]
-			res, gerr := f.s.GenerateSyncForUser(genCtx, userID, it.page.ID, idemKey+":"+it.slug, GenerateInput{
-				Prompt:     in.Prompt,
-				PageType:   it.plan.PageType,
-				ThemeSlug:  theme,
-				OutputMode: "tsx",
-			})
-			if gerr != nil {
-				return
-			}
-			version := res.Version
-			// If the live AI provider failed validation, fall back to the
-			// deterministic engine so the page is never empty.
-			if version.ID == "" && res.Job.ID != "" {
-				f.s.ReprocessWithMock(genCtx, userID, res.Job.ID)
-				if reloaded, rerr := f.s.pages.FindOwned(genCtx, userID, it.page.ID); rerr == nil && reloaded.CurrentVersionID != "" {
-					if v, verr := f.s.versions.FindOwned(genCtx, userID, it.page.ID, reloaded.CurrentVersionID); verr == nil {
-						version = v
-					}
-				}
-			}
-			if version.ID == "" {
-				return
-			}
-			results[i] = &GeneratedPageDTO{
-				ID:           it.page.ID,
-				Name:         it.plan.Name,
-				Slug:         it.slug,
-				PageType:     it.plan.PageType,
-				QualityScore: round1(version.QualityScore),
-				Schema:       schemaOrEmpty(version.SchemaJSON),
-				Files:        versionFiles(version),
-			}
-		}(i)
-	}
-	wg.Wait()
-
-	out := []GeneratedPageDTO{}
-	for _, r := range results {
-		if r != nil {
-			out = append(out, *r)
-		}
-	}
-	return out, nil
-}
-
 // ProjectPages returns every page of a project with its current version's
 // schema + code (used by the studio to render the page tabs on load).
 func (f *FrontendService) ProjectPages(ctx context.Context, userID, projectID string) ([]GeneratedPageDTO, error) {
@@ -820,75 +764,13 @@ func schemaOrEmpty(m map[string]interface{}) map[string]interface{} {
 	return m
 }
 
-func schemaFromMap(m map[string]interface{}) (schema.PageSchema, error) {
-	raw, err := json.Marshal(m)
-	if err != nil {
-		return schema.PageSchema{}, err
-	}
-	var ps schema.PageSchema
-	if err := json.Unmarshal(raw, &ps); err != nil {
-		return schema.PageSchema{}, err
-	}
-	return ps, nil
-}
-
-// SetProjectTheme switches a project's design system WITHOUT regenerating. The
-// stored schema is theme-independent, so it re-renders every page's code with the
-// new theme's tokens and rewrites generated_code IN PLACE (no new version, no AI
-// call, no credit). The live preview re-skins client-side from the same catalog.
-func (f *FrontendService) SetProjectTheme(ctx context.Context, userID, projectID, themeSlug string) error {
-	themeSlug = strings.TrimSpace(themeSlug)
-	if themeSlug == "" {
-		return apperrors.BadRequest("themeSlug is required")
-	}
-	project, err := f.s.projects.FindOwned(ctx, userID, projectID)
-	if err != nil {
-		return apperrors.NotFound("Project not found or you do not have access.")
-	}
-
-	// Resolve the renderer library: a visual design-system slug (shadcn,
-	// neobrutalism, glass, …) is passed straight through (token renderer); other
-	// slugs resolve to a component-library kit via the themes table.
-	library := themeSlug
-	if !designsystem.Has(themeSlug) {
-		library = f.s.themeLibrary(ctx, themeSlug)
-	}
-
-	pages, err := f.s.pages.ListByOwnedProject(ctx, userID, projectID)
-	if err != nil {
-		return err
-	}
-	for _, page := range pages {
-		if page.CurrentVersionID == "" {
-			continue
-		}
-		v, err := f.s.versions.FindOwned(ctx, userID, page.ID, page.CurrentVersionID)
-		if err != nil {
-			continue
-		}
-		ps, err := schemaFromMap(v.SchemaJSON)
-		if err != nil {
-			continue
-		}
-		code := renderer.Generate(ps, "tsx", library)
-		if err := f.s.versions.UpdateGeneratedCode(ctx, v.ID, code); err != nil {
-			return err
-		}
-	}
-
-	project.DefaultThemeSlug = themeSlug
-	if _, err := f.s.projects.UpdateOwned(ctx, userID, project); err != nil {
-		return err
-	}
-	return nil
-}
-
 type exportRoute struct {
 	slug     string
 	name     string
 	pageType string
 	pageTSX  string
 	schema   string
+	html     string // set for code-gen screens (standalone HTML, no TSX)
 }
 
 // ExportProjectZip bundles every generated page into a RUNNABLE Next.js App Router
@@ -934,6 +816,8 @@ func (f *FrontendService) ExportProjectZip(ctx context.Context, userID, projectI
 		for _, file := range p.Files {
 			if strings.HasSuffix(file.Path, "page.tsx") {
 				r.pageTSX = file.Content
+			} else if strings.HasSuffix(file.Path, "index.html") {
+				r.html = file.Content
 			} else if strings.HasSuffix(file.Path, ".json") {
 				r.schema = file.Content
 			}
@@ -963,7 +847,14 @@ func (f *FrontendService) ExportProjectZip(ctx context.Context, userID, projectI
 
 	// --- one route per screen + its schema ---
 	for _, r := range routes {
-		add("app/"+r.slug+"/page.tsx", r.pageTSX)
+		if r.html != "" {
+			// Code-gen screen: ship the standalone HTML and render it in the Next.js
+			// route inside an isolated iframe (its CSS is self-scoped).
+			add("screens/"+r.slug+".html", r.html)
+			add("app/"+r.slug+"/page.tsx", codeGenNextPage(r.html))
+		} else {
+			add("app/"+r.slug+"/page.tsx", r.pageTSX)
+		}
 		if r.schema != "" {
 			add("schemas/"+r.slug+".json", r.schema)
 		}
@@ -1720,11 +1611,61 @@ func versionFiles(v domain.PageVersion) []FileDTO {
 			schemaJSON = string(raw)
 		}
 	}
+	// Code-gen page: the screen IS self-contained HTML, so surface it as a real
+	// index.html the user can view / copy / download (not an empty TSX component).
+	if v.SchemaJSON != nil {
+		if html, ok := v.SchemaJSON["html"].(string); ok && strings.TrimSpace(html) != "" {
+			doc := codeGenHTMLDocument(html)
+			return []FileDTO{
+				{Path: "index.html", Language: "html", Content: doc, Size: len(doc)},
+				{Path: "schema/page.json", Language: "json", Content: schemaJSON, Size: len(schemaJSON)},
+			}
+		}
+	}
 	files := []FileDTO{
 		{Path: "app/page.tsx", Language: "typescript", Content: v.GeneratedCode, Size: len(v.GeneratedCode)},
 		{Path: "schema/page.json", Language: "json", Content: schemaJSON, Size: len(schemaJSON)},
 	}
 	return files
+}
+
+// codeGenNextPage renders a code-gen screen inside the exported Next.js app via
+// an isolated iframe (the screen's CSS is self-scoped, so this avoids leaking
+// styles into the host app). `doc` is the full standalone HTML document.
+func codeGenNextPage(doc string) string {
+	enc, err := json.Marshal(doc)
+	if err != nil {
+		enc = []byte("\"\"")
+	}
+	return `// Code-generated screen, rendered in an isolated iframe.
+export default function Page() {
+  const srcDoc = ` + string(enc) + `;
+  return (
+    <iframe
+      srcDoc={srcDoc}
+      title="Screen"
+      style={{ width: "100%", height: "100vh", border: 0 }}
+    />
+  );
+}
+`
+}
+
+// codeGenHTMLDocument wraps the model's screen body into a complete, runnable
+// standalone HTML document (the body already carries its own scoped <style>).
+func codeGenHTMLDocument(body string) string {
+	return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Generated screen</title>
+<style>*{box-sizing:border-box}html,body{margin:0;padding:0;background:#f2f2f7;font-family:-apple-system,BlinkMacSystemFont,'Inter',system-ui,sans-serif}</style>
+</head>
+<body>
+` + body + `
+</body>
+</html>`
 }
 
 func jobDTO(job domain.GenerationJob, version domain.PageVersion) JobDTO {
@@ -1809,6 +1750,18 @@ func normalizeStatus(status string) string {
 		return "archived"
 	default:
 		return "active"
+	}
+}
+
+// normalizePlatform coerces an arbitrary client value into the two supported
+// generation targets. Anything that is not an explicit "mobile" falls back to
+// "web", so existing projects (and bad input) keep the website behaviour.
+func normalizePlatform(platform string) string {
+	switch strings.ToLower(strings.TrimSpace(platform)) {
+	case "mobile", "mobile-app", "app", "ios", "android":
+		return "mobile"
+	default:
+		return "web"
 	}
 }
 

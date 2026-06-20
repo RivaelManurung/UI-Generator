@@ -54,8 +54,14 @@ async function parseBody<T>(res: Response): Promise<T> {
 }
 
 interface RequestOptions {
-  /** Send a fresh Idempotency-Key header (for generation POSTs). */
+  /** Send a fresh random Idempotency-Key header (for generation POSTs). */
   idempotent?: boolean;
+  /**
+   * Send a STABLE Idempotency-Key so the server dedupes a duplicate/retried
+   * request to the same batch (prevents double-charging credits). Takes
+   * precedence over `idempotent`.
+   */
+  idempotencyKey?: string;
   /** Skip the 401 refresh-and-retry flow (used by the refresh call itself). */
   skipRefresh?: boolean;
 }
@@ -96,7 +102,9 @@ async function request<T>(
     if (token) {
       headers.set("Authorization", `Bearer ${token}`);
     }
-    if (options.idempotent && typeof crypto !== "undefined" && crypto.randomUUID) {
+    if (options.idempotencyKey) {
+      headers.set("Idempotency-Key", options.idempotencyKey);
+    } else if (options.idempotent && typeof crypto !== "undefined" && crypto.randomUUID) {
       headers.set("Idempotency-Key", crypto.randomUUID());
     }
     return headers;

@@ -10,7 +10,6 @@ import (
 	"os"
 	"regexp"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -113,7 +112,6 @@ type GenerateResult struct {
 }
 
 type StudioService struct {
-	mu              sync.RWMutex
 	jwtSecret       string
 	accessTokenTTL  time.Duration
 	refreshTokenTTL time.Duration
@@ -150,8 +148,6 @@ func NewStudioServiceWithConfig(cfg config.Config) *StudioService {
 		refreshTokenTTL: cfg.RefreshTokenTTL,
 		aiProvider: func() ai.Provider {
 			switch strings.ToLower(cfg.AIProvider) {
-			case "gemini":
-				return ai.NewGeminiProvider(cfg.GeminiAPIKey)
 			case "openai", "tokenrouter", "openrouter", "commandcode", "9router", "ninerouter":
 				return ai.NewOpenAIProvider(cfg.OpenAIAPIKey, cfg.OpenAIBaseURL, cfg.OpenAIModel)
 			default:
@@ -189,7 +185,7 @@ func NewStudioServiceWithConfig(cfg config.Config) *StudioService {
 			EnqueueFunc: func(ctx context.Context, task queue.GenerationTask) error {
 				// Simulate async background worker in-memory
 				go func() {
-					worker := NewGenerationWorker(logger.New(), nil, s, s.aiProvider)
+					worker := NewGenerationWorker(logger.New(), s, s.aiProvider)
 					_ = worker.ProcessJob(context.Background(), task.JobID, task.UserID, task.Operation, task.SectionIndex)
 				}()
 				return nil
@@ -329,19 +325,25 @@ func seedDB(ctx context.Context, pool *pgxpool.Pool) {
 		ComponentHint int
 		Tier          string
 		Description   string
+		Platform      string
 	}{
-		{ID: "hospital-dashboard", Name: "Hospital Operations", Domain: "hospital", PageType: "dashboard", ComponentHint: 10, Tier: "Free", Description: "Appointments, doctors, departments, and patient flow."},
-		{ID: "inventory-list", Name: "Inventory List", Domain: "inventory", PageType: "list", ComponentHint: 8, Tier: "Premium", Description: "SKU health, stock movement, and supplier alerts."},
-		{ID: "finance-analytics", Name: "Finance Analytics", Domain: "finance", PageType: "dashboard", ComponentHint: 9, Tier: "Premium", Description: "Revenue, invoices, accounts, and cash-flow analytics."},
-		{ID: "school-attendance", Name: "School Attendance", Domain: "education", PageType: "list", ComponentHint: 7, Tier: "Free", Description: "Attendance table, filters, and class-level summaries."},
-		{ID: "village-management", Name: "Village Management", Domain: "government", PageType: "dashboard", ComponentHint: 9, Tier: "Free", Description: "Citizen services, cases, budgets, and activity reports."},
+		{ID: "hospital-dashboard", Name: "Hospital Operations", Domain: "hospital", PageType: "dashboard", ComponentHint: 10, Tier: "Free", Description: "Appointments, doctors, departments, and patient flow.", Platform: "web"},
+		{ID: "inventory-list", Name: "Inventory List", Domain: "inventory", PageType: "list", ComponentHint: 8, Tier: "Premium", Description: "SKU health, stock movement, and supplier alerts.", Platform: "web"},
+		{ID: "finance-analytics", Name: "Finance Analytics", Domain: "finance", PageType: "dashboard", ComponentHint: 9, Tier: "Premium", Description: "Revenue, invoices, accounts, and cash-flow analytics.", Platform: "web"},
+		{ID: "school-attendance", Name: "School Attendance", Domain: "education", PageType: "list", ComponentHint: 7, Tier: "Free", Description: "Attendance table, filters, and class-level summaries.", Platform: "web"},
+		{ID: "village-management", Name: "Village Management", Domain: "government", PageType: "dashboard", ComponentHint: 9, Tier: "Free", Description: "Citizen services, cases, budgets, and activity reports.", Platform: "web"},
+		// Mobile app starters — the handoff pre-selects the Mobile App target so the
+		// generated screens render as a single-column phone app with a bottom tab bar.
+		{ID: "food-delivery-app", Name: "Food Delivery App", Domain: "logistics", PageType: "dashboard", ComponentHint: 6, Tier: "Free", Description: "Active orders, rider earnings, and a live delivery map.", Platform: "mobile"},
+		{ID: "fitness-tracker-app", Name: "Fitness Tracker App", Domain: "health", PageType: "dashboard", ComponentHint: 6, Tier: "Free", Description: "Daily activity rings, workouts, and progress streaks.", Platform: "mobile"},
+		{ID: "mobile-banking-app", Name: "Mobile Banking App", Domain: "finance", PageType: "dashboard", ComponentHint: 7, Tier: "Premium", Description: "Balance, recent transactions, cards, and quick transfers.", Platform: "mobile"},
 	}
 	for _, tpl := range templates {
 		_, _ = pool.Exec(ctx, `
-			INSERT INTO templates (id, name, domain, page_type, component_hint, tier, description, created_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, now())
-			ON CONFLICT (id) DO NOTHING;
-		`, tpl.ID, tpl.Name, tpl.Domain, tpl.PageType, tpl.ComponentHint, tpl.Tier, tpl.Description)
+			INSERT INTO templates (id, name, domain, page_type, component_hint, tier, description, platform, created_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now())
+			ON CONFLICT (id) DO UPDATE SET platform = EXCLUDED.platform;
+		`, tpl.ID, tpl.Name, tpl.Domain, tpl.PageType, tpl.ComponentHint, tpl.Tier, tpl.Description, tpl.Platform)
 	}
 }
 
@@ -863,7 +865,7 @@ func (s *StudioService) HasAsyncWorker() bool {
 // Redis-backed worker is available (e.g. local single-binary deployments), so
 // jobs do not get stuck in the "queued" state forever.
 func (s *StudioService) processInline(ctx context.Context, jobID string, userID string, operation string, sectionIndex int) {
-	worker := NewGenerationWorker(logger.New(), nil, s, s.aiProvider)
+	worker := NewGenerationWorker(logger.New(), s, s.aiProvider)
 	_ = worker.ProcessJob(ctx, jobID, userID, operation, sectionIndex)
 }
 
@@ -898,7 +900,7 @@ func (s *StudioService) ReprocessWithMock(ctx context.Context, userID, jobID str
 	if err := s.jobs.UpdateStatus(ctx, jobID, "queued", ""); err != nil {
 		return
 	}
-	worker := NewGenerationWorker(logger.New(), nil, s, ai.NewMockProvider())
+	worker := NewGenerationWorker(logger.New(), s, ai.NewMockProvider())
 	_ = worker.ProcessJob(ctx, jobID, userID, operationGenerate, 0)
 }
 
@@ -1254,10 +1256,6 @@ func validateIdempotencyKey(requestID string) error {
 	return nil
 }
 
-func scopedIdempotencyKey(userID, operation, requestID string) string {
-	return userID + ":" + operation + ":" + strings.TrimSpace(requestID)
-}
-
 func (s *StudioService) validateGenerateInput(ctx context.Context, input GenerateInput) error {
 	if pageType := strings.TrimSpace(input.PageType); pageType != "" && !allowedInputPageTypes[pageType] {
 		return apperrors.Validation("pageType is not supported")
@@ -1300,14 +1298,6 @@ func title(value string) string {
 		return "Custom"
 	}
 	return strings.ToUpper(value[:1]) + value[1:]
-}
-
-func summarize(value string) string {
-	value = strings.TrimSpace(value)
-	if len(value) <= 28 {
-		return value
-	}
-	return value[:28] + "..."
 }
 
 func slugify(value string) string {

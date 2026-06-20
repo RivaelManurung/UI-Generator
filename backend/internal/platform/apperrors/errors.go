@@ -20,10 +20,6 @@ func New(status int, code string, message string) *Error {
 	return &Error{Status: status, Code: code, Message: message}
 }
 
-func WithDetails(status int, code string, message string, details map[string]interface{}) *Error {
-	return &Error{Status: status, Code: code, Message: message, Details: details}
-}
-
 func BadRequest(message string) *Error {
 	return New(http.StatusBadRequest, "BAD_REQUEST", message)
 }

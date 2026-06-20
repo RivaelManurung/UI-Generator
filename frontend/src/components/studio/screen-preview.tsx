@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, MoreVertical, Pencil, RefreshCw, Trash2, Wrench } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -49,7 +49,22 @@ interface ScreenPreviewProps {
   total?: number;
   /** Layout family inferred from the prompt — drives the live build skeleton. */
   buildKind?: LayoutKind;
+  /**
+   * Mobile-app projects render inside a portrait PHONE MOCKUP frame (bezel +
+   * notch) instead of the resizable website device widths — the Desktop/Tablet
+   * device switcher is for website responsive testing and is hidden for these.
+   */
+  phone?: boolean;
+  /** Live HTML-so-far of a code-gen screen being written (Stitch-style build). */
+  streamHtml?: string;
+  /** Stable iframe shell doc for the streaming preview (set once, postMessage-fed). */
+  streamShell?: string;
 }
+
+// Portrait phone-mockup geometry (iPhone-ish 19.5:9), used for mobile projects.
+const PHONE_LOGICAL_W = 390;
+const PHONE_RATIO = 844 / 390;
+const PHONE_BEZEL = 12;
 
 /**
  * A clean, full-area preview of the selected generated screen. The page is
@@ -71,9 +86,13 @@ export function ScreenPreview({
   completed,
   total,
   buildKind,
+  phone = false,
+  streamHtml,
+  streamShell,
 }: ScreenPreviewProps) {
   const stageRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const streamRef = useRef<HTMLIFrameElement>(null);
   const [stage, setStage] = useState({ w: 0, h: 0 });
   // "Fit page" scales the whole page down to fit the stage (no scroll);
   // "Fit width" (default) fills the width and scrolls vertically.
@@ -100,6 +119,21 @@ export function ScreenPreview({
     () => screens.find((s) => s.key === activeKey) ?? screens[0] ?? null,
     [screens, activeKey],
   );
+
+  // Live code-gen build: the active screen has no final HTML yet but the model
+  // is streaming one — show the persistent streaming iframe (fed via postMessage)
+  // instead of the skeleton.
+  const streaming = !!(phone && active && active.html === null && streamHtml && streamShell);
+
+  // Push the latest streamed HTML into the persistent streaming iframe. The shell
+  // (srcDoc) never changes, so the iframe doesn't reload — only its content grows.
+  const postStream = useCallback(() => {
+    if (!streamHtml) return;
+    streamRef.current?.contentWindow?.postMessage({ __cgstream: true, html: streamHtml }, "*");
+  }, [streamHtml]);
+  useEffect(() => {
+    postStream();
+  }, [postStream]);
 
   // Reset the measured content height whenever the shown screen changes — the
   // new screen reports its own height through the probe below.
@@ -129,7 +163,28 @@ export function ScreenPreview({
   let frameH = stage.h > 0 ? Math.round(stage.h) : 600;
   let iframeH = scale > 0 ? Math.round(frameH / scale) : frameH;
 
-  const canFitPage = fitPage && contentH > 0 && stage.w > 0 && stage.h > 0;
+  // Phone-mockup geometry: fit a portrait device into the stage (by height, then
+  // clamp by width), scaling the 390px-wide page down to the screen window.
+  let phoneScreenW = 0;
+  let phoneScreenH = 0;
+  let phoneScale = 0;
+  let phoneIframeH = 0;
+  if (phone && stage.w > 0 && stage.h > 0) {
+    const availH = stage.h - 24;
+    const availW = stage.w - 24;
+    let h = availH - PHONE_BEZEL * 2;
+    let w = h / PHONE_RATIO;
+    if (w + PHONE_BEZEL * 2 > availW) {
+      w = availW - PHONE_BEZEL * 2;
+      h = w * PHONE_RATIO;
+    }
+    phoneScreenW = Math.max(0, Math.round(w));
+    phoneScreenH = Math.max(0, Math.round(h));
+    phoneScale = phoneScreenW > 0 ? phoneScreenW / PHONE_LOGICAL_W : 0;
+    phoneIframeH = phoneScale > 0 ? Math.round(phoneScreenH / phoneScale) : phoneScreenH;
+  }
+
+  const canFitPage = !phone && fitPage && contentH > 0 && stage.w > 0 && stage.h > 0;
   if (canFitPage) {
     // Fit the WHOLE page: scale by whichever of width/height is tighter, never
     // upscaling. The iframe renders at its natural content height so nothing
@@ -191,7 +246,7 @@ export function ScreenPreview({
         </div>
 
         <div className="ml-auto flex shrink-0 items-center gap-1.5">
-          {active && active.html !== null ? (
+          {!phone && active && active.html !== null ? (
             <div
               role="group"
               aria-label="Preview fit mode"
@@ -286,7 +341,60 @@ export function ScreenPreview({
 
       {/* Full-area preview stage */}
       <div ref={stageRef} className="relative grid flex-1 place-items-center overflow-hidden p-4">
-        {!active ? null : active.html === null ? (
+        {!active ? null : phone ? (
+          /* PHONE MOCKUP: portrait device frame with a notch, screen clipped to
+             rounded corners. Used for mobile-app projects. */
+          <div
+            className="relative shrink-0 rounded-[46px] bg-galaxy p-3 shadow-2xl ring-1 ring-black/10"
+            style={{ width: phoneScreenW + PHONE_BEZEL * 2, height: phoneScreenH + PHONE_BEZEL * 2 }}
+          >
+            <div className="pointer-events-none absolute left-1/2 top-3 z-10 h-[18px] w-28 -translate-x-1/2 rounded-b-[14px] bg-galaxy" />
+            <div className="relative h-full w-full overflow-hidden rounded-[34px] bg-white">
+              {streaming ? (
+                <iframe
+                  ref={streamRef}
+                  sandbox={PREVIEW_IFRAME_SANDBOX_POLICY}
+                  srcDoc={streamShell}
+                  onLoad={postStream}
+                  title="Building screen…"
+                  scrolling="yes"
+                  style={{
+                    width: PHONE_LOGICAL_W,
+                    height: phoneIframeH,
+                    transform: `scale(${phoneScale})`,
+                    transformOrigin: "top left",
+                    border: 0,
+                  }}
+                />
+              ) : active.html === null ? (
+                <LivePreviewSkeleton
+                  kind="mobile"
+                  screenName={active.name}
+                  pageType={active.pageType}
+                  total={total ?? 0}
+                  width={PHONE_LOGICAL_W}
+                  height={phoneIframeH}
+                  scale={phoneScale}
+                />
+              ) : (
+                <iframe
+                  ref={iframeRef}
+                  sandbox={PREVIEW_IFRAME_SANDBOX_POLICY}
+                  srcDoc={htmlWithProbe}
+                  title={`Preview of ${active.name}`}
+                  scrolling="yes"
+                  style={{
+                    width: PHONE_LOGICAL_W,
+                    height: phoneIframeH,
+                    transform: `scale(${phoneScale})`,
+                    transformOrigin: "top left",
+                    border: 0,
+                  }}
+                />
+              )}
+            </div>
+          </div>
+        ) : active.html === null ? (
           <div
             className="overflow-hidden rounded-xl border border-border bg-white shadow-sm"
             style={{ width: frameW || undefined, height: frameH }}

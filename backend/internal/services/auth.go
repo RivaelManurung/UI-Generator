@@ -39,14 +39,6 @@ type RefreshInput struct {
 	RefreshToken string `json:"refreshToken"`
 }
 
-type refreshTokenRecord struct {
-	UserID        string
-	Hash          string
-	ExpiresAt     time.Time
-	RevokedAt     *time.Time
-	RotatedFromID string
-}
-
 type tokenClaims struct {
 	Email string `json:"email"`
 	Role  string `json:"role"`
@@ -372,7 +364,6 @@ func (s *StudioService) VerifyAccessTokenWithContext(ctx context.Context, token 
 	return user, nil
 }
 
-
 func (s *StudioService) issueSessionLocked(ctx context.Context, user domain.User, rotatedFromID string) (domain.AuthSession, error) {
 	accessToken, err := s.signAccessToken(user.ID, user.Email, user.Role)
 	if err != nil {
@@ -405,7 +396,6 @@ func (s *StudioService) issueSessionLocked(ctx context.Context, user domain.User
 	if err := s.refreshTokens.Create(ctx, record); err != nil {
 		return domain.AuthSession{}, err
 	}
-
 
 	return domain.AuthSession{
 		User:         user,

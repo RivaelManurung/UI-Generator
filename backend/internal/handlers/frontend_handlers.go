@@ -16,6 +16,11 @@ import (
 // request id so generation always has a stable key.
 func idempotencyKey(c *gin.Context) string {
 	if key := c.GetHeader("Idempotency-Key"); key != "" {
+		// Cap the client-supplied key so a malicious oversized header can't grow
+		// the in-memory batch tracker's heap footprint.
+		if len(key) > 200 {
+			key = key[:200]
+		}
 		return key
 	}
 	return middleware.RequestIDFrom(c)
@@ -196,6 +201,12 @@ func (h *Handler) FEBatchEvents(c *gin.Context) {
 	first := true
 	lastCompleted, lastTotal := -1, -1
 	lastStatus := ""
+	lastStreamLen := -1
+	// Heartbeat: emit a comment frame when nothing has changed for ~15s so an
+	// idle proxy does not drop a long, slow-model page mid-generation. At a 400ms
+	// tick that is ~37 idle ticks.
+	const heartbeatTicks = 37
+	idleTicks := 0
 	for {
 		select {
 		case <-ctx.Done():
@@ -207,13 +218,19 @@ func (h *Handler) FEBatchEvents(c *gin.Context) {
 				flusher.Flush()
 				return
 			}
-			if first || batch.Completed != lastCompleted || batch.Status != lastStatus || batch.Total != lastTotal {
+			if first || batch.Completed != lastCompleted || batch.Status != lastStatus || batch.Total != lastTotal || len(batch.StreamHtml) != lastStreamLen {
 				first = false
+				idleTicks = 0
 				lastCompleted, lastTotal, lastStatus = batch.Completed, batch.Total, batch.Status
+				lastStreamLen = len(batch.StreamHtml)
 				if data, mErr := json.Marshal(batch); mErr == nil {
 					fmt.Fprintf(c.Writer, "data: %s\n\n", data)
 					flusher.Flush()
 				}
+			} else if idleTicks++; idleTicks >= heartbeatTicks {
+				idleTicks = 0
+				fmt.Fprint(c.Writer, ": ping\n\n")
+				flusher.Flush()
 			}
 			if batch.Status == "completed" || batch.Status == "failed" {
 				return
@@ -229,23 +246,6 @@ func (h *Handler) FEProjectPages(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, pages)
-}
-
-// FESetProjectTheme switches the project's design system and re-renders all pages'
-// code in place — no regeneration, no AI, no credit.
-func (h *Handler) FESetProjectTheme(c *gin.Context) {
-	var input struct {
-		ThemeSlug string `json:"themeSlug"`
-	}
-	if err := c.ShouldBindJSON(&input); err != nil {
-		writeError(c, apperrors.BadRequest("invalid JSON body"))
-		return
-	}
-	if err := h.frontend.SetProjectTheme(c.Request.Context(), mustUser(c).ID, c.Param("id"), input.ThemeSlug); err != nil {
-		writeServiceError(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"ok": true, "themeSlug": input.ThemeSlug})
 }
 
 // FEProjectExportZip streams a .zip of all generated files for the project.
