@@ -181,7 +181,7 @@ func (f *FrontendService) AdminUserProjects(ctx context.Context, userID string) 
 		return out, nil
 	}
 	rows, err := f.s.pool.Query(ctx, `
-		SELECT p.id::text, p.name, p.domain, COALESCE(p.status,'active'), u.name, u.email,
+		SELECT p.id::text, p.name, COALESCE(p.status,'active'), u.name, u.email,
 		  (SELECT count(*) FROM project_pages pg WHERE pg.project_id=p.id AND pg.deleted_at IS NULL) AS pages_count,
 		  COALESCE((SELECT AVG(v.quality_score) FROM project_pages pg
 		    JOIN page_versions v ON v.id=pg.current_version_id
@@ -198,7 +198,7 @@ func (f *FrontendService) AdminUserProjects(ctx context.Context, userID string) 
 		var d AdminProjectDTO
 		var quality float64
 		var createdAt, updatedAt time.Time
-		if err := rows.Scan(&d.ID, &d.Name, &d.Domain, &d.Status, &d.Owner, &d.OwnerEmail, &d.PagesCount, &quality, &createdAt, &updatedAt); err != nil {
+		if err := rows.Scan(&d.ID, &d.Name, &d.Status, &d.Owner, &d.OwnerEmail, &d.PagesCount, &quality, &createdAt, &updatedAt); err != nil {
 			return nil, fmt.Errorf("admin user projects scan: %w", err)
 		}
 		d.QualityAverage = round1(quality)

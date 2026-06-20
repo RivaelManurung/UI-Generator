@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { PREVIEW_IFRAME_SANDBOX_POLICY } from "@/lib/security/preview-sandbox";
 import type { DeviceKey } from "@/lib/constants/device-options";
+import { kindFromPageType, type LayoutKind } from "@/lib/generation/layout-kind";
+import { LivePreviewSkeleton } from "./live-preview-skeleton";
 
 export interface ScreenCard {
   key: string;
@@ -45,6 +47,8 @@ interface ScreenPreviewProps {
   generating?: boolean;
   completed?: number;
   total?: number;
+  /** Layout family inferred from the prompt — drives the live build skeleton. */
+  buildKind?: LayoutKind;
 }
 
 /**
@@ -66,6 +70,7 @@ export function ScreenPreview({
   generating,
   completed,
   total,
+  buildKind,
 }: ScreenPreviewProps) {
   const stageRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -282,9 +287,19 @@ export function ScreenPreview({
       {/* Full-area preview stage */}
       <div ref={stageRef} className="relative grid flex-1 place-items-center overflow-hidden p-4">
         {!active ? null : active.html === null ? (
-          <div className="flex animate-in fade-in flex-col items-center gap-3 text-muted-foreground">
-            <Loader2 className="size-7 animate-spin text-primary" aria-hidden="true" />
-            <span className="text-sm font-semibold">Generating this screen…</span>
+          <div
+            className="overflow-hidden rounded-xl border border-border bg-white shadow-sm"
+            style={{ width: frameW || undefined, height: frameH }}
+          >
+            <LivePreviewSkeleton
+              kind={kindFromPageType(active.pageType) ?? buildKind ?? "dashboard"}
+              screenName={active.name}
+              pageType={active.pageType}
+              total={total ?? 0}
+              width={logicalW}
+              height={iframeH}
+              scale={scale}
+            />
           </div>
         ) : (
           <div

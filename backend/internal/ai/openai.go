@@ -297,16 +297,17 @@ func (p *OpenAIProvider) GenerateApp(ctx context.Context, request AppRequest) (A
 // PlanApp asks the model to choose the page set for the brief (Auto mode). It is
 // a cheap, short call (just names + types) made before GenerateApp fills them in.
 func (p *OpenAIProvider) PlanApp(ctx context.Context, prompt, domain string) ([]AppPagePlan, error) {
-	system := "You are a senior product designer planning the screens of a dashboard/admin app. Respond with ONLY a valid minified JSON array, no markdown, no prose."
+	system := "You are a senior product designer planning the screens of a web app. Plan the pages the BRIEF actually asks for — never force a dashboard onto a brief that is not about one. Respond with ONLY a valid minified JSON array, no markdown, no prose."
 	user := fmt.Sprintf(`Decide the smallest COHERENT set of pages for this app brief. Choose 1 to 5 pages.
 Brief: %q
 Domain: %q
 
 Rules:
-- Each page MUST use a DISTINCT "pageType" from this set ONLY: "dashboard","list","detail","form","analytics","login".
-- Include "dashboard" first UNLESS the brief is clearly only a single form or login.
+- Each page MUST use a DISTINCT "pageType" from this set ONLY: "dashboard","list","detail","form","analytics","login","register","forgot".
+- Lead with the page the brief is MOST about: an auth brief leads with "login"; an admin/reporting brief leads with "dashboard". Do NOT add a "dashboard" unless the brief is actually about one.
+- If the brief is an authentication flow, return ONLY the auth pages it names: "login", "register", "forgot" (each as its own page) — no dashboard, list or analytics.
 - Only add a page the brief actually justifies — do NOT pad to 5. A simple brief may be 1-2 pages.
-- "name" is a short, brief-specific screen title (e.g. "Sales Overview", "Patient Queue").
+- "name" is a short, brief-specific screen title (e.g. "Sales Overview", "Welcome Back", "Create Account").
 
 Output ONLY this JSON array (most to least important):
 [{"name":"...","pageType":"..."}]`, prompt, domain)
@@ -349,7 +350,7 @@ func appUserPrompt(request AppRequest, v variation) string {
 	b.WriteString(`
 Each page object MUST be: {"pageType":"...","domain":"` + request.Domain + `","layout":"admin-sidebar | top-nav","theme":"` + request.ThemeSlug + `","title":"...","brand":"<product name>","nav":["<product-specific menu>"...],"sections":[ ... ]}
 - "brand": the product/app NAME from the brief (same on every page). "nav": 4-7 PRODUCT-SPECIFIC menu items derived from the brief (same on every page) — NEVER a generic ["Dashboard","Analytics","Customers","Projects","Reports"] list. "layout": pick "admin-sidebar" for data/ops apps or "top-nav" for portals/marketing/consumer apps (same on every page).
-Allowed section "type" values: statsGrid, chartPanel, dataTable, activityTimeline, filterToolbar, formSection, profileSummary, tabbedContent, notificationList, emptyState, actionFooter, progressList, kanbanBoard, calendarView, mapPanel, stepper, authForm. For a "login" pageType, use a single "authForm". Choose the components each page actually needs from the brief — do NOT repeat a fixed KPI+chart+table skeleton.
+Allowed section "type" values: statsGrid, chartPanel, dataTable, activityTimeline, filterToolbar, formSection, profileSummary, tabbedContent, notificationList, emptyState, actionFooter, progressList, kanbanBoard, calendarView, mapPanel, stepper, authForm. For a "login", "register" or "forgot" pageType, use a single "authForm" (its fields/title/actions match that auth page). Choose the components each page actually needs from the brief — do NOT repeat a fixed KPI+chart+table skeleton.
 - statsGrid.items[]: {label,value,trend,icon,spark:[6-12 numbers]} (4-6 items). The "spark" array is the metric's recent trend — make it agree with "trend" (rising if +, falling if -).
 - chartPanel: {title,chartType:"bar|line|area|donut|stacked",categories:[x-axis labels],series:[[numbers]]}. series is REQUIRED real data: one inner array per line/bar set (use ONE inner array for bar/line/area/donut, 2-3 for stacked/multi). categories.length MUST equal each series length. Use believable domain numbers, NOT round placeholders.
 - dataTable: {title,columns[],rows[][]} (>=2 columns, >=5 realistic rows; include at least one numeric column). filterToolbar: {searchPlaceholder,filters[],primaryAction}. formSection: {title,fields[{label,type}],submitLabel} (>=4 fields). actionFooter: {primaryAction,actions[]}. profileSummary: {title,entity,properties{}} (>=4 properties). activityTimeline: {title,items[{label,value}]} (>=3 items). progressList/stepper: {title,items[{label,value}]} (value is a % or short status). EVERY section must be fully populated — NEVER emit an empty section.
@@ -486,6 +487,10 @@ func requirementsFor(pageType string) string {
 		return `This is an "analytics" page: it MUST include "statsGrid" (with icons), "filterToolbar", "chartPanel", AND "dataTable". Add a second chartPanel or a "featureGrid" of insights for depth.`
 	case "login":
 		return `This is a "login" page: it MUST include an "authForm" (centered sign-in card). Set its title, subtitle, fields (email + password), primaryAction (e.g. "Sign in"), and actions (e.g. ["Forgot password?","Don't have an account? Sign up"]).`
+	case "register":
+		return `This is a "register" page: it MUST include an "authForm" (centered card). Set its title (e.g. "Create Account"), subtitle, fields (full name + email + password + confirm password), primaryAction (e.g. "Create account"), and actions (e.g. ["Already have an account? Sign in"]).`
+	case "forgot":
+		return `This is a "forgot" password page: it MUST include an "authForm" (centered card). Set its title (e.g. "Reset Password"), a short subtitle explaining an email reset link, ONE field (email), primaryAction (e.g. "Send reset link"), and actions (e.g. ["Back to login"]).`
 	default:
 		return `This is a "dashboard" page. For PRODUCTION density it MUST include ALL of: a "statsGrid" (4-6 KPI items, each with an icon), a "chartPanel", a "dataTable" (>=2 columns and >=5 realistic rows), AND an "activityTimeline" (>=3 items). Strongly consider opening with a "hero" and adding a "featureGrid" or "gallery" so the page feels rich and complete. Every section must be fully populated — NEVER emit an empty section.`
 	}
@@ -508,7 +513,7 @@ Rules:
 - DESIGN PER PROMPT: the section MIX, ORDER, and COMPOSITION must reflect THIS brief — two different briefs must NOT produce the same skeleton. Choose the components the product actually needs (a kanban tool leads with a board, an analytics tool with charts, a catalog with a gallery), not a fixed KPI+chart+table template.
 - Be GENEROUS and rich: use 4-7 sections of VARIED types so the page feels like a real, polished product screen (think Stitch / Linear / Vercel quality) — never a sparse 2-section skeleton.
 - "sections" use ONLY these "type" values: statsGrid, chartPanel, dataTable, activityTimeline, filterToolbar, formSection, profileSummary, tabbedContent, notificationList, emptyState, actionFooter, hero, gallery, featureGrid, pricingTable, testimonials, stepper, progressList, mapPanel, kanbanBoard, calendarView, authForm.
-- authForm: { "type":"authForm", "title":..., "subtitle":..., "fields":[{ "label":"Email","type":"email" },{ "label":"Password","type":"password" }], "primaryAction":"Sign in", "actions":["Forgot password?","Don't have an account? Sign up"] } — a centered SaaS sign-in card (logo, show-password toggle, remember me, and a "Continue with Google" button are added automatically). For a "login" pageType, use ONE authForm as the only section.
+- authForm: { "type":"authForm", "title":..., "subtitle":..., "fields":[{ "label":"Email","type":"email" },{ "label":"Password","type":"password" }], "primaryAction":"Sign in", "actions":["Forgot password?","Don't have an account? Sign up"] } — a centered SaaS auth card (logo, show-password toggle, and a "Continue with Google" button are added automatically). For a "login", "register" or "forgot" pageType, use ONE authForm as the only section, with the fields/title/actions appropriate to that page.
 - statsGrid: { "type":"statsGrid", "items":[{ "label":..., "value":..., "trend":..., "icon":"<icon>", "spark":[6-12 numbers] }] } (>= 3 items). ALWAYS set "icon". "spark" is the metric's recent trend series — make it rise when "trend" is positive and fall when negative.
 - chartPanel: { "type":"chartPanel", "title":..., "chartType":"bar|line|area|donut|stacked", "categories":[x-axis labels], "series":[[numbers]] }. "series" is REQUIRED real data (one inner array per line/bar; 2-3 inner arrays only for "stacked"). categories.length MUST equal each series length. Use believable, domain-specific numbers — never flat or round placeholders.
 - dataTable: { "type":"dataTable", "title":..., "columns":[...], "rows":[[...]] } (>= 2 columns, realistic example rows).

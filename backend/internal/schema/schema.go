@@ -15,6 +15,8 @@ var allowedPageTypes = map[string]bool{
 	"form":      true,
 	"detail":    true,
 	"login":     true,
+	"register":  true,
+	"forgot":    true,
 	"analytics": true,
 }
 
@@ -579,9 +581,9 @@ func Validate(page PageSchema) error {
 		if !seen["statsGrid"] || !seen["chartPanel"] {
 			return errors.New("analytics page requires statsGrid and chartPanel")
 		}
-	case "login":
+	case "login", "register", "forgot":
 		if !seen["formSection"] && !seen["authForm"] {
-			return errors.New("login page requires a formSection or authForm")
+			return errors.New("auth page requires a formSection or authForm")
 		}
 	}
 

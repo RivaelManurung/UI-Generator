@@ -132,7 +132,7 @@ func TestAdminUserProjectsAndGenerations_Scoped(t *testing.T) {
 	userID, cleanup := seedPaidUser(t, studio, ctx)
 	defer cleanup()
 
-	if _, err := studio.CreateProjectForUser(ctx, userID, CreateProjectInput{Name: "Owned", Domain: "hospital", DefaultThemeSlug: "shadcn"}); err != nil {
+	if _, err := studio.CreateProjectForUser(ctx, userID, CreateProjectInput{Name: "Owned", DefaultThemeSlug: "shadcn"}); err != nil {
 		t.Fatalf("create project: %v", err)
 	}
 

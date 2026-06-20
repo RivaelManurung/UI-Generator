@@ -99,7 +99,7 @@ func parseISO(s string) time.Time {
 // returns the initial batch state immediately. Generation continues server-side
 // regardless of client navigation; progress is polled via GetBatch.
 func (f *FrontendService) StartGenerationBatch(ctx context.Context, userID, projectID, idemKey string, in GenerateAppInput) (GenerationBatch, error) {
-	project, err := f.s.projects.FindOwned(ctx, userID, projectID)
+	_, err := f.s.projects.FindOwned(ctx, userID, projectID)
 	if err != nil {
 		return GenerationBatch{}, apperrors.NotFound("Project not found or you do not have access.")
 	}
@@ -122,7 +122,7 @@ func (f *FrontendService) StartGenerationBatch(ctx context.Context, userID, proj
 	f.batches.put(batch)
 
 	theme := f.normalizeTheme(ctx, in.ThemeSlug)
-	domainName := project.Domain
+	domainName := ""
 
 	type planned struct {
 		plan pagePlan

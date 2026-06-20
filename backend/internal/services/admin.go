@@ -173,7 +173,6 @@ func (f *FrontendService) adminUserByID(ctx context.Context, userID string) (Adm
 type AdminProjectDTO struct {
 	ID             string  `json:"id"`
 	Name           string  `json:"name"`
-	Domain         string  `json:"domain"`
 	Status         string  `json:"status"`
 	Owner          string  `json:"owner"`
 	OwnerEmail     string  `json:"ownerEmail"`
@@ -189,7 +188,7 @@ func (f *FrontendService) AdminListProjects(ctx context.Context) ([]AdminProject
 		return out, nil
 	}
 	rows, err := f.s.pool.Query(ctx, `
-		SELECT p.id, p.name, p.domain, COALESCE(p.status,'active'), u.name, u.email,
+		SELECT p.id, p.name, COALESCE(p.status,'active'), u.name, u.email,
 		  (SELECT count(*) FROM project_pages pg WHERE pg.project_id=p.id AND pg.deleted_at IS NULL) AS pages_count,
 		  COALESCE((SELECT AVG(v.quality_score) FROM project_pages pg
 		    JOIN page_versions v ON v.id=pg.current_version_id
@@ -206,7 +205,7 @@ func (f *FrontendService) AdminListProjects(ctx context.Context) ([]AdminProject
 		var d AdminProjectDTO
 		var quality float64
 		var createdAt, updatedAt time.Time
-		if err := rows.Scan(&d.ID, &d.Name, &d.Domain, &d.Status, &d.Owner, &d.OwnerEmail, &d.PagesCount, &quality, &createdAt, &updatedAt); err != nil {
+		if err := rows.Scan(&d.ID, &d.Name, &d.Status, &d.Owner, &d.OwnerEmail, &d.PagesCount, &quality, &createdAt, &updatedAt); err != nil {
 			return nil, err
 		}
 		d.QualityAverage = round1(quality)

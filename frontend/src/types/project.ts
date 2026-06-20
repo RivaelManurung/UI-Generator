@@ -4,7 +4,6 @@ export interface Project {
   id: string;
   name: string;
   description: string;
-  domain: string;
   status: ProjectStatus;
   defaultThemeSlug: string;
   pagesCount: number;

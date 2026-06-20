@@ -2,18 +2,12 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowUpRight, Code2, FolderKanban, FolderPlus, Loader2, Trash2 } from "lucide-react";
+import { Code2, FolderKanban, FolderPlus, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
-import {
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -23,11 +17,17 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { SectionCard } from "@/components/ui/section-card";
-import { Reveal, RevealGroup, RevealItem } from "@/components/ui/reveal";
+import { Reveal } from "@/components/ui/reveal";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ProjectPreviewThumb } from "@/components/app/project-preview-thumb";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useProjects } from "@/hooks/use-projects";
-import { useDesignSystems } from "@/hooks/use-design-systems";
 import type { Project, ProjectStatus } from "@/types/project";
 import { cn } from "@/lib/utils";
 
@@ -44,9 +44,13 @@ function formatDate(value?: string) {
   return date.toLocaleDateString();
 }
 
+function initialOf(name: string) {
+  const trimmed = name.trim();
+  return trimmed ? trimmed.charAt(0).toUpperCase() : "?";
+}
+
 export default function ProjectsPage() {
   const { projects, loading, deleteProject } = useProjects();
-  const designSystems = useDesignSystems();
   const [pendingDelete, setPendingDelete] = useState<Project | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -80,126 +84,136 @@ export default function ProjectsPage() {
       actions={newProjectAction}
     >
       {loading ? (
-        <div className="grid gap-5 md:grid-cols-2">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <SectionCard key={index} className="overflow-hidden">
-              <Skeleton className="h-36 w-full rounded-none" />
-              <CardHeader className="space-y-2">
-                <Skeleton className="h-5 w-40" />
-                <Skeleton className="h-4 w-full" />
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Skeleton className="h-6 w-3/4" />
-                <Skeleton className="h-9 w-full" />
-              </CardContent>
-            </SectionCard>
-          ))}
-        </div>
+        <SectionCard className="overflow-hidden">
+          <div className="divide-y divide-border">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <div key={index} className="flex items-center gap-4 px-5 py-4">
+                <Skeleton className="size-11 shrink-0 rounded-xl" />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <Skeleton className="h-4 w-48" />
+                  <Skeleton className="h-3 w-72 max-w-full" />
+                </div>
+                <Skeleton className="hidden h-8 w-28 sm:block" />
+              </div>
+            ))}
+          </div>
+        </SectionCard>
       ) : projects.length === 0 ? (
         <Reveal>
           <EmptyState />
         </Reveal>
       ) : (
-        <RevealGroup className="grid gap-5 md:grid-cols-2" stagger={0.05}>
-          {projects.map((project) => (
-            <RevealItem key={project.id} className="flex">
-              <SectionCard className="group flex w-full flex-col overflow-hidden transition hover:-translate-y-0.5 hover:border-planetary/30 hover:shadow-brand-sm">
-                <ProjectPreviewThumb
-                  projectId={project.id}
-                  brand={project.name}
-                  themeSlug={project.defaultThemeSlug}
-                  designSystems={designSystems}
-                />
-                <CardHeader className="flex-row items-start justify-between space-y-0 pt-5">
-                  <div className="min-w-0 space-y-1.5">
-                    <CardTitle className="tracking-normal">
-                      <Link
-                        href={`/app/projects/${project.id}`}
-                        className="transition-colors group-hover:text-planetary hover:text-planetary"
-                      >
-                        {project.name}
-                      </Link>
-                    </CardTitle>
-                    {project.description ? (
-                      <CardDescription className="line-clamp-2">
-                        {project.description}
-                      </CardDescription>
-                    ) : null}
-                  </div>
-                  <Badge
-                    variant="outline"
-                    className={cn("capitalize shrink-0", statusStyles[project.status])}
-                  >
-                    {project.status}
-                  </Badge>
-                </CardHeader>
-                <CardContent className="grid flex-1 content-end gap-4">
-                  <div className="flex flex-wrap items-stretch gap-2.5">
-                    <div className="flex flex-col justify-center rounded-xl border border-planetary/15 bg-sky/40 px-3.5 py-2">
-                      <span className="text-[0.65rem] font-semibold uppercase tracking-widest text-muted-foreground">
-                        Quality
-                      </span>
-                      <span className="text-lg font-bold tabular-nums tracking-normal text-galaxy">
+        <Reveal>
+          <SectionCard className="overflow-hidden">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/40 hover:bg-muted/40">
+                    <TableHead className="px-5 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                      Project
+                    </TableHead>
+                    <TableHead className="hidden text-xs font-semibold uppercase tracking-widest text-muted-foreground md:table-cell">
+                      Status
+                    </TableHead>
+                    <TableHead className="hidden text-right text-xs font-semibold uppercase tracking-widest text-muted-foreground md:table-cell">
+                      Quality
+                    </TableHead>
+                    <TableHead className="hidden text-right text-xs font-semibold uppercase tracking-widest text-muted-foreground md:table-cell">
+                      Pages
+                    </TableHead>
+                    <TableHead className="hidden text-xs font-semibold uppercase tracking-widest text-muted-foreground lg:table-cell">
+                      Updated
+                    </TableHead>
+                    <TableHead className="px-5 text-right text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                      <span className="sr-only">Actions</span>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {projects.map((project) => (
+                    <TableRow key={project.id} className="group hover:bg-sky/30">
+                      <TableCell className="px-5 py-3.5">
+                        <div className="flex items-center gap-3">
+                          <span
+                            className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-planetary to-universe text-sm font-bold text-white shadow-brand-sm"
+                            aria-hidden
+                          >
+                            {initialOf(project.name)}
+                          </span>
+                          <div className="min-w-0">
+                            <Link
+                              href={`/app/studio/${project.id}`}
+                              className="block truncate font-semibold tracking-normal text-foreground transition-colors group-hover:text-planetary hover:text-planetary"
+                            >
+                              {project.name}
+                            </Link>
+                            {project.description ? (
+                              <p className="truncate text-sm text-muted-foreground">
+                                {project.description}
+                              </p>
+                            ) : null}
+                            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground md:hidden">
+                              <Badge
+                                variant="outline"
+                                className={cn("capitalize", statusStyles[project.status])}
+                              >
+                                {project.status}
+                              </Badge>
+                              <span className="tabular-nums">Quality {project.qualityAverage}</span>
+                              <span aria-hidden>·</span>
+                              <span className="tabular-nums">
+                                {project.pagesCount} {project.pagesCount === 1 ? "page" : "pages"}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        <Badge
+                          variant="outline"
+                          className={cn("capitalize", statusStyles[project.status])}
+                        >
+                          {project.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="hidden text-right text-sm font-semibold tabular-nums text-galaxy md:table-cell">
                         {project.qualityAverage}
-                      </span>
-                    </div>
-                    <div className="flex flex-col justify-center rounded-xl border border-border bg-card px-3.5 py-2">
-                      <span className="text-[0.65rem] font-semibold uppercase tracking-widest text-muted-foreground">
-                        Pages
-                      </span>
-                      <span className="text-lg font-bold tabular-nums tracking-normal text-foreground">
+                      </TableCell>
+                      <TableCell className="hidden text-right text-sm font-semibold tabular-nums text-foreground md:table-cell">
                         {project.pagesCount}
-                      </span>
-                    </div>
-                    <div className="flex min-w-0 flex-1 flex-col justify-center rounded-xl border border-border bg-card px-3.5 py-2">
-                      <span className="text-[0.65rem] font-semibold uppercase tracking-widest text-muted-foreground">
-                        Updated
-                      </span>
-                      <span className="truncate text-sm font-semibold tracking-normal text-foreground">
+                      </TableCell>
+                      <TableCell className="hidden text-sm text-muted-foreground lg:table-cell">
                         {formatDate(project.updatedAt)}
-                      </span>
-                    </div>
-                  </div>
-                  {project.domain ? (
-                    <Badge
-                      variant="outline"
-                      className="w-fit bg-muted/50 text-foreground border-border capitalize"
-                    >
-                      {project.domain}
-                    </Badge>
-                  ) : null}
-                  <div className="flex flex-wrap gap-2">
-                    <Link
-                      className={cn(buttonVariants(), "bg-primary text-primary-foreground")}
-                      href={`/app/studio/${project.id}`}
-                      aria-label={`Open studio for project ${project.name}`}
-                    >
-                      <Code2 className="h-4 w-4" />
-                      Open studio
-                    </Link>
-                    <Link
-                      className={cn(buttonVariants({ variant: "outline" }), "group/details")}
-                      href={`/app/projects/${project.id}`}
-                      aria-label={`View details of project ${project.name}`}
-                    >
-                      Details
-                      <ArrowUpRight className="h-4 w-4 transition-transform group-hover/details:translate-x-0.5 group-hover/details:-translate-y-0.5 group-hover/details:text-planetary" />
-                    </Link>
-                    <Button
-                      variant="outline"
-                      className="ml-auto text-destructive hover:text-destructive hover:border-destructive/30"
-                      onClick={() => setPendingDelete(project)}
-                      aria-label={`Delete project ${project.name}`}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      Delete
-                    </Button>
-                  </div>
-                </CardContent>
-              </SectionCard>
-            </RevealItem>
-          ))}
-        </RevealGroup>
+                      </TableCell>
+                      <TableCell className="px-5 py-3.5 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Button size="sm" asChild className="bg-primary text-primary-foreground">
+                            <Link
+                              href={`/app/studio/${project.id}`}
+                              aria-label={`Open studio for project ${project.name}`}
+                            >
+                              <Code2 className="h-4 w-4" />
+                              <span className="hidden sm:inline">Open studio</span>
+                            </Link>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            className="text-muted-foreground hover:text-destructive"
+                            onClick={() => setPendingDelete(project)}
+                            aria-label={`Delete project ${project.name}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </SectionCard>
+        </Reveal>
       )}
 
       <Dialog

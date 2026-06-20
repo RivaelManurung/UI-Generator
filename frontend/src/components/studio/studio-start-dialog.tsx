@@ -101,7 +101,6 @@ export function StudioStartDialog({
                         </span>
                         <span className="block truncate text-xs text-muted-foreground">
                           {project.pagesCount} {project.pagesCount === 1 ? "page" : "pages"}
-                          {project.domain ? ` · ${project.domain}` : ""}
                         </span>
                       </span>
                     </span>

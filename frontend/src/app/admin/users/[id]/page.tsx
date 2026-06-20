@@ -698,11 +698,6 @@ export default function AdminUserDetailPage() {
                             <TableRow key={project.id} className="hover:bg-sky/30">
                               <TableCell className="min-w-0">
                                 <p className="truncate font-medium text-foreground">{project.name}</p>
-                                {project.domain ? (
-                                  <p className="truncate text-xs text-muted-foreground capitalize">
-                                    {project.domain}
-                                  </p>
-                                ) : null}
                               </TableCell>
                               <TableCell>{projectStatusBadge(project.status)}</TableCell>
                               <TableCell className="text-right tabular-nums">

@@ -222,7 +222,7 @@ func TestGenerateUsesWalletPerUser(t *testing.T) {
 	if err != nil {
 		t.Fatalf("register: %v", err)
 	}
-	project, err := studio.CreateProjectForUser(ctx, other.User.ID, CreateProjectInput{Name: "Wallet Project", Domain: "finance", DefaultThemeSlug: "studio-neutral"})
+	project, err := studio.CreateProjectForUser(ctx, other.User.ID, CreateProjectInput{Name: "Wallet Project", DefaultThemeSlug: "studio-neutral"})
 	if err != nil {
 		t.Fatalf("create project: %v", err)
 	}
@@ -310,7 +310,7 @@ func TestIdempotencyKeyIsScopedByUser(t *testing.T) {
 	if err != nil {
 		t.Fatalf("register: %v", err)
 	}
-	project, err := studio.CreateProjectForUser(ctx, other.User.ID, CreateProjectInput{Name: "Scoped Project", Domain: "finance", DefaultThemeSlug: "studio-neutral"})
+	project, err := studio.CreateProjectForUser(ctx, other.User.ID, CreateProjectInput{Name: "Scoped Project", DefaultThemeSlug: "studio-neutral"})
 	if err != nil {
 		t.Fatalf("create project: %v", err)
 	}

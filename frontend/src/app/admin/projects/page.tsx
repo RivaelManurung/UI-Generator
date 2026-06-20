@@ -243,9 +243,6 @@ export default function AdminProjectsPage() {
                     Owner
                   </TableHead>
                   <TableHead className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
-                    Domain
-                  </TableHead>
-                  <TableHead className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
                     Status
                   </TableHead>
                   <TableHead className="text-right text-xs font-semibold uppercase tracking-normal text-muted-foreground">
@@ -266,14 +263,14 @@ export default function AdminProjectsPage() {
                 {loading ? (
                   Array.from({ length: 5 }).map((_, index) => (
                     <TableRow key={index}>
-                      <TableCell colSpan={9}>
+                      <TableCell colSpan={8}>
                         <Skeleton className="h-6 w-full" />
                       </TableCell>
                     </TableRow>
                   ))
                 ) : filtered.length === 0 ? (
                   <TableRow className="hover:bg-transparent">
-                    <TableCell colSpan={9} className="py-14">
+                    <TableCell colSpan={8} className="py-14">
                       <div className="flex flex-col items-center gap-3 text-center">
                         <span className="flex size-12 items-center justify-center rounded-2xl bg-sky/60 text-planetary">
                           {search ? (
@@ -307,9 +304,6 @@ export default function AdminProjectsPage() {
                       </TableCell>
                       <TableCell className="font-semibold text-foreground">{project.name}</TableCell>
                       <TableCell className="text-muted-foreground">{project.ownerEmail}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{project.domain}</Badge>
-                      </TableCell>
                       <TableCell>{statusBadge(project.status)}</TableCell>
                       <TableCell className="text-right tabular-nums text-foreground">
                         {project.pagesCount}

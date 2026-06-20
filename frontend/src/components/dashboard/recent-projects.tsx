@@ -70,9 +70,6 @@ export function RecentProjects({
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="truncate text-sm font-semibold text-foreground">{project.name}</p>
-                      <Badge variant="outline" className="border-border bg-muted/50 text-foreground">
-                        {project.domain}
-                      </Badge>
                       <Badge
                         variant="outline"
                         className={cn("capitalize", statusStyles[project.status])}

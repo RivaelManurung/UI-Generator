@@ -270,6 +270,16 @@ func buildSchema(prompt, pageType, domainName, theme string) schema.PageSchema {
 		base.Sections = []schema.Section{
 			{Type: "authForm", Title: "Welcome back", Subtitle: "Sign in to " + labels.Title, Fields: []schema.Field{{Label: "Email", Type: "email", Hint: "you@company.com"}, {Label: "Password", Type: "password", Hint: "••••••••"}}, PrimaryAction: "Sign in", Actions: []string{"Forgot password?", "Don't have an account? Sign up"}},
 		}
+	case "register":
+		base.Title = "Create Account"
+		base.Sections = []schema.Section{
+			{Type: "authForm", Title: "Create Account", Subtitle: "Start building with " + labels.Title, Fields: []schema.Field{{Label: "Full Name", Type: "text", Hint: "Jane Doe"}, {Label: "Email", Type: "email", Hint: "you@company.com"}, {Label: "Password", Type: "password", Hint: "••••••••"}, {Label: "Confirm Password", Type: "password", Hint: "••••••••"}}, PrimaryAction: "Create account", Actions: []string{"Already have an account? Sign in"}},
+		}
+	case "forgot":
+		base.Title = "Reset Password"
+		base.Sections = []schema.Section{
+			{Type: "authForm", Title: "Reset Password", Subtitle: "Enter your email and we'll send a reset link", Fields: []schema.Field{{Label: "Email", Type: "email", Hint: "you@company.com"}}, PrimaryAction: "Send reset link", Actions: []string{"Back to login"}},
+		}
 	case "detail":
 		base.Sections = []schema.Section{
 			{Type: "profileSummary", Title: labels.Entity + " Summary", Entity: labels.Entity, Properties: map[string]string{"Status": "Active", "Owner": labels.Owner, "Risk": "Low"}},

@@ -44,7 +44,6 @@ type ProjectDTO struct {
 	ID               string  `json:"id"`
 	Name             string  `json:"name"`
 	Description      string  `json:"description"`
-	Domain           string  `json:"domain"`
 	Status           string  `json:"status"`
 	DefaultThemeSlug string  `json:"defaultThemeSlug"`
 	PagesCount       int     `json:"pagesCount"`
@@ -56,7 +55,6 @@ type ProjectDTO struct {
 type CreateProjectFEInput struct {
 	Name             string `json:"name"`
 	Description      string `json:"description"`
-	Domain           string `json:"domain"`
 	Status           string `json:"status"`
 	DefaultThemeSlug string `json:"defaultThemeSlug"`
 }
@@ -64,7 +62,6 @@ type CreateProjectFEInput struct {
 type UpdateProjectFEInput struct {
 	Name             *string `json:"name"`
 	Description      *string `json:"description"`
-	Domain           *string `json:"domain"`
 	Status           *string `json:"status"`
 	DefaultThemeSlug *string `json:"defaultThemeSlug"`
 }
@@ -213,7 +210,6 @@ func (f *FrontendService) CreateProject(ctx context.Context, userID string, in C
 	proj, err := f.s.CreateProjectForUser(ctx, userID, CreateProjectInput{
 		Name:             in.Name,
 		Description:      in.Description,
-		Domain:           f.normalizeDomain(in.Domain),
 		DefaultThemeSlug: f.normalizeTheme(ctx, in.DefaultThemeSlug),
 	})
 	if err != nil {
@@ -243,7 +239,6 @@ func (f *FrontendService) UpdateProject(ctx context.Context, userID, projectID s
 	update := UpdateProjectInput{
 		Name:             existing.Name,
 		Description:      existing.Description,
-		Domain:           existing.Domain,
 		DefaultThemeSlug: existing.DefaultThemeSlug,
 	}
 	if in.Name != nil {
@@ -251,9 +246,6 @@ func (f *FrontendService) UpdateProject(ctx context.Context, userID, projectID s
 	}
 	if in.Description != nil {
 		update.Description = *in.Description
-	}
-	if in.Domain != nil {
-		update.Domain = f.normalizeDomain(*in.Domain)
 	}
 	if in.DefaultThemeSlug != nil {
 		update.DefaultThemeSlug = f.normalizeTheme(ctx, *in.DefaultThemeSlug)
@@ -304,7 +296,6 @@ func (f *FrontendService) projectDTO(ctx context.Context, userID string, p domai
 		ID:               p.ID,
 		Name:             p.Name,
 		Description:      p.Description,
-		Domain:           p.Domain,
 		Status:           status,
 		DefaultThemeSlug: p.DefaultThemeSlug,
 		PagesCount:       len(pages),
@@ -408,14 +399,12 @@ func (f *FrontendService) Generate(ctx context.Context, userID, projectID, idemK
 	if err != nil {
 		return JobDTO{}, err
 	}
-	project, err := f.s.projects.FindOwned(ctx, userID, projectID)
-	if err != nil {
+	if _, err := f.s.projects.FindOwned(ctx, userID, projectID); err != nil {
 		return JobDTO{}, apperrors.NotFound("Project not found or you do not have access.")
 	}
 	res, err := f.s.GenerateSyncForUser(ctx, userID, page.ID, idemKey, GenerateInput{
 		Prompt:     in.Prompt,
 		PageType:   page.PageType,
-		Domain:     project.Domain,
 		ThemeSlug:  f.normalizeTheme(ctx, in.ThemeSlug),
 		OutputMode: "tsx",
 	})
@@ -470,7 +459,8 @@ func planPages(count int) []pagePlan {
 // allowedPageTypes are the page types the Auto planner may choose from.
 var allowedPageTypes = map[string]bool{
 	"dashboard": true, "list": true, "detail": true,
-	"form": true, "analytics": true, "login": true,
+	"form": true, "analytics": true,
+	"login": true, "register": true, "forgot": true,
 }
 
 func defaultPageName(pageType string) string {
@@ -485,9 +475,61 @@ func defaultPageName(pageType string) string {
 		return "Analytics"
 	case "login":
 		return "Sign In"
+	case "register":
+		return "Create Account"
+	case "forgot":
+		return "Reset Password"
 	default:
 		return "Overview"
 	}
+}
+
+// detectAuthFlow recognises an authentication flow brief (login + register and/or
+// forgot-password) and returns the EXACT set of auth pages the user asked for, in
+// flow order. This honours an explicit multi-page auth brief instead of letting
+// the dashboard-biased AI planner reframe it as an "auth control center" dashboard.
+// It does not constrain how each page is designed — only which pages exist. Returns
+// nil for anything that is not a clear, multi-page auth flow.
+func detectAuthFlow(prompt string) []pagePlan {
+	p := strings.ToLower(prompt)
+	has := func(subs ...string) bool {
+		for _, s := range subs {
+			if strings.Contains(p, s) {
+				return true
+			}
+		}
+		return false
+	}
+	login := has("login", "log in", "sign in", "sign-in", "masuk")
+	register := has("register", "registration", "sign up", "sign-up", "signup", "create account", "daftar")
+	// Compound keywords only: a bare "forgot"/"reset" would false-positive on
+	// non-auth prompts (e.g. "track what users forgot to submit").
+	forgot := has("forgot password", "forgot my password", "reset password", "password reset", "lupa kata sandi", "lupa password")
+	authContext := login || has("authentication", "auth system", "sistem autentikasi", "autentikasi")
+
+	count := 0
+	for _, ok := range []bool{login, register, forgot} {
+		if ok {
+			count++
+		}
+	}
+	// Only treat as a flow when it's clearly an auth context AND names at least two
+	// auth pages — a lone "login page" stays single-page (handled by the lead).
+	if !authContext || count < 2 {
+		return nil
+	}
+
+	var out []pagePlan
+	if login {
+		out = append(out, pagePlan{Name: defaultPageName("login"), PageType: "login"})
+	}
+	if register {
+		out = append(out, pagePlan{Name: defaultPageName("register"), PageType: "register"})
+	}
+	if forgot {
+		out = append(out, pagePlan{Name: defaultPageName("forgot"), PageType: "forgot"})
+	}
+	return out
 }
 
 // sanitizeAutoPlan validates an AI-proposed plan: keeps only allowed, DISTINCT
@@ -518,7 +560,9 @@ func sanitizeAutoPlan(in []ai.AppPagePlan) []pagePlan {
 }
 
 // orderedDefaults is the fallback page set in priority order (distinct types),
-// used to pad a plan up to the requested count.
+// used to pad a plan up to the requested count. Auth pages (register/forgot) are
+// intentionally excluded — they are only ever produced by detectAuthFlow from an
+// explicit auth brief, never used to pad a generic app.
 var orderedDefaults = []pagePlan{
 	{Name: "Overview", PageType: "dashboard"},
 	{Name: "Records", PageType: "list"},
@@ -594,6 +638,15 @@ func dedupePlan(in []pagePlan) []pagePlan {
 // The planner only fills ADDITIONAL pages after that lead. So a login brief yields
 // a login page first, even with a manual page count of 1.
 func (f *FrontendService) resolveAppPlan(ctx context.Context, in GenerateAppInput, domainName string) []pagePlan {
+	// An explicit auth flow (login + register/forgot) is honoured exactly: build
+	// the auth pages the user named, in order, and skip the dashboard-biased planner.
+	if authFlow := detectAuthFlow(in.Prompt); len(authFlow) > 0 {
+		if !in.Auto && in.PageCount >= 1 && in.PageCount < len(authFlow) {
+			return authFlow[:in.PageCount]
+		}
+		return authFlow
+	}
+
 	intent := ai.NormalizeIntent(in.Prompt, "", domainName)
 	// A specific intent (anything but the generic "dashboard" default) is a strong
 	// signal the user asked for that exact screen — lead with it.
@@ -639,7 +692,7 @@ func (f *FrontendService) resolveAppPlan(ctx context.Context, in GenerateAppInpu
 // form) for one project from a single prompt. Each page is a real project_page
 // with its own validated version + kit-rendered code.
 func (f *FrontendService) GenerateMultiPage(ctx context.Context, userID, projectID, idemKey string, in GenerateAppInput) ([]GeneratedPageDTO, error) {
-	project, err := f.s.projects.FindOwned(ctx, userID, projectID)
+	_, err := f.s.projects.FindOwned(ctx, userID, projectID)
 	if err != nil {
 		return nil, apperrors.NotFound("Project not found or you do not have access.")
 	}
@@ -658,7 +711,7 @@ func (f *FrontendService) GenerateMultiPage(ctx context.Context, userID, project
 		page domain.Page
 	}
 	items := make([]planned, 0, in.PageCount)
-	for _, pp := range f.resolveAppPlan(ctx, in, project.Domain) {
+	for _, pp := range f.resolveAppPlan(ctx, in, "") {
 		slug := slugify(pp.Name)
 		page, ok := bySlug[slug]
 		if !ok {
@@ -688,7 +741,6 @@ func (f *FrontendService) GenerateMultiPage(ctx context.Context, userID, project
 			res, gerr := f.s.GenerateSyncForUser(genCtx, userID, it.page.ID, idemKey+":"+it.slug, GenerateInput{
 				Prompt:     in.Prompt,
 				PageType:   it.plan.PageType,
-				Domain:     project.Domain,
 				ThemeSlug:  theme,
 				OutputMode: "tsx",
 			})
@@ -1736,14 +1788,6 @@ func mapTransactionType(t string, amount int) string {
 		}
 		return "usage"
 	}
-}
-
-func (f *FrontendService) normalizeDomain(domainName string) string {
-	d := strings.ToLower(strings.TrimSpace(domainName))
-	if d == "" || !allowedDomains[d] {
-		return "custom"
-	}
-	return d
 }
 
 func (f *FrontendService) normalizeTheme(ctx context.Context, slug string) string {

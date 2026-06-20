@@ -26,12 +26,12 @@ Jangan membuat desain terasa seperti:
 
 Gunakan palette planetary dari `frontend/src/app/globals.css`.
 
-- Planetary: `#334EAC`
-- Universe: `#7096D1`
-- Venus: `#BAD6EB`
-- Meteor: `#F7F2EB`
-- Galaxy: `#081F5C`
-- Sky: `#D0E3FF`
+- Planetary: `#3B5BDB`
+- Universe: `#6D86E6`
+- Venus: `#CDD9F7`
+- Meteor: `#F5F6F8`
+- Galaxy: `#16181D`
+- Sky: `#EAF0FE`
 - White: `#FFFFFF`
 
 Token Tailwind yang tersedia:
@@ -57,17 +57,18 @@ Token semantik tetap dipakai:
 
 Aturan warna:
 
-- Background utama halaman harus putih atau sangat terang.
-- Galaxy dipakai untuk teks utama, sidebar gelap, dan kontras kuat.
-- Planetary dipakai untuk CTA utama, active state penting, progress, dan chart aktif.
-- Universe/Venus/Sky dipakai untuk panel pendukung, preview, chart pasif, empty state, dan highlight.
-- Meteor dipakai untuk neutral warm surface, bukan sebagai warna dominan.
+- Background utama halaman harus putih bersih.
+- Galaxy adalah near-black (`#16181D`) untuk teks utama, heading, dan kontras kuat — bukan navy lagi.
+- Planetary adalah royal indigo (`#3B5BDB`) untuk CTA utama, active state penting, eyebrow, progress, dan chart aktif.
+- Universe/Venus/Sky dipakai untuk panel pendukung, preview, chart pasif, empty state, dan highlight (lavender).
+- Meteor (`#F5F6F8`) dipakai untuk neutral light-gray surface, bukan sebagai warna dominan.
+- Jangan pakai navy/planetary lama: `#334EAC`, `#081F5C`, `#7096D1`, `#BAD6EB`, `#D0E3FF`, `#F7F2EB`.
 - Jangan pakai beige/black lama: `#15130f`, `#f7f3ec`, `#fffdf8`, `#efe5d5`, `#d7c4a3`, `#1c1914`.
 - Jangan hardcode warna lama. Kalau butuh warna baru, tambahkan token dulu dan jelaskan alasannya.
 
 ## Typography
 
-- Font wajib Geist dari root layout.
+- Font wajib Inter dari root layout (`--font-inter`).
 - Jangan pakai `font-serif`.
 - Jangan pakai letter spacing negatif.
 - Heading harus kuat tapi clean: `font-bold` atau `font-black`, `tracking-normal`.

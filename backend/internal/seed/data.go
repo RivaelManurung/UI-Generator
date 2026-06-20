@@ -22,9 +22,9 @@ type StudioData struct {
 func Studio() StudioData {
 	base := time.Date(2026, 6, 5, 15, 0, 0, 0, time.UTC)
 	projects := []domain.Project{
-		{ID: "proj_hospital_ops", UserID: "user_demo", Name: "Hospital Ops Dashboard", Description: "Operational command center for appointments, patient flow, and doctors.", Domain: "hospital", DefaultThemeSlug: "medical-clean", CreatedAt: base.Add(-72 * time.Hour), UpdatedAt: base.Add(-20 * time.Minute)},
-		{ID: "proj_finance_command", UserID: "user_demo", Name: "Finance Command Center", Description: "Revenue, invoices, accounts, and cash-flow analytics workspace.", Domain: "finance", DefaultThemeSlug: "precision-indigo", CreatedAt: base.Add(-48 * time.Hour), UpdatedAt: base.Add(-4 * time.Hour)},
-		{ID: "proj_inventory_control", UserID: "user_demo", Name: "Inventory Control", Description: "Stock movement, suppliers, warehouse alerts, and SKU monitoring.", Domain: "inventory", DefaultThemeSlug: "emerald-grid", CreatedAt: base.Add(-36 * time.Hour), UpdatedAt: base.Add(-90 * time.Minute)},
+		{ID: "proj_hospital_ops", UserID: "user_demo", Name: "Hospital Ops Dashboard", Description: "Operational command center for appointments, patient flow, and doctors.", DefaultThemeSlug: "medical-clean", CreatedAt: base.Add(-72 * time.Hour), UpdatedAt: base.Add(-20 * time.Minute)},
+		{ID: "proj_finance_command", UserID: "user_demo", Name: "Finance Command Center", Description: "Revenue, invoices, accounts, and cash-flow analytics workspace.", DefaultThemeSlug: "precision-indigo", CreatedAt: base.Add(-48 * time.Hour), UpdatedAt: base.Add(-4 * time.Hour)},
+		{ID: "proj_inventory_control", UserID: "user_demo", Name: "Inventory Control", Description: "Stock movement, suppliers, warehouse alerts, and SKU monitoring.", DefaultThemeSlug: "emerald-grid", CreatedAt: base.Add(-36 * time.Hour), UpdatedAt: base.Add(-90 * time.Minute)},
 	}
 
 	pages := []domain.Page{

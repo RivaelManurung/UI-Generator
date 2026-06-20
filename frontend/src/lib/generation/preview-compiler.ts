@@ -154,6 +154,8 @@ const SUBTITLE: Record<string, string> = {
   detail: "Full record details",
   analytics: "Trends, filters and downloadable reports",
   login: "Sign in to continue",
+  register: "Create your account to get started",
+  forgot: "Reset your password",
 };
 
 /* --------------------------------------------------------------- chart svg */
@@ -577,19 +579,63 @@ function renderFormSection(section: SchemaSection): string {
 const GOOGLE_SVG =
   '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="#4285F4" d="M22.5 12.2c0-.7-.06-1.4-.18-2.04H12v3.86h5.9a5.04 5.04 0 0 1-2.19 3.31v2.75h3.54c2.07-1.9 3.25-4.71 3.25-7.88z"/><path fill="#34A853" d="M12 23c2.95 0 5.43-.98 7.24-2.96l-3.54-2.75c-.98.66-2.24 1.05-3.7 1.05-2.85 0-5.26-1.92-6.12-4.5H2.23v2.84A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.88 13.84a6.6 6.6 0 0 1 0-4.22V6.78H2.23a11 11 0 0 0 0 9.9l3.65-2.84z"/><path fill="#EA4335" d="M12 5.32c1.6 0 3.05.55 4.18 1.63l3.14-3.14A11 11 0 0 0 12 1 11 11 0 0 0 2.23 6.78l3.65 2.84C6.74 7.24 9.15 5.32 12 5.32z"/></svg>';
 
-// renderAuthForm draws a real, centered SaaS sign-in card (logo, title, email +
-// password with show-password toggle, remember me, forgot link, primary CTA, a
-// divider and a "Continue with Google" button). Returns just the card; the caller
-// supplies the centering/gradient wrapper (.auth-page or .auth-wrap).
-function renderAuthForm(section: SchemaSection, brand: string): string {
+type AuthVariant = "login" | "register" | "forgot";
+
+// authVariant maps a page type to the auth card variant. Defaults to "login".
+function authVariant(pageType: string): AuthVariant {
+  const t = (pageType || "").toLowerCase();
+  if (t === "register" || t === "signup") return "register";
+  if (t === "forgot" || t === "reset") return "forgot";
+  return "login";
+}
+
+// Default fields per auth variant, used when the schema does not supply its own.
+const AUTH_FIELDS: Record<AuthVariant, { label: string; type: string; hint?: string }[]> = {
+  login: [
+    { label: "Email", type: "email", hint: "you@company.com" },
+    { label: "Password", type: "password", hint: "••••••••" },
+  ],
+  register: [
+    { label: "Full Name", type: "text", hint: "Jane Doe" },
+    { label: "Email", type: "email", hint: "you@company.com" },
+    { label: "Password", type: "password", hint: "••••••••" },
+    { label: "Confirm Password", type: "password", hint: "••••••••" },
+  ],
+  forgot: [{ label: "Email", type: "email", hint: "you@company.com" }],
+};
+
+const AUTH_COPY: Record<AuthVariant, { title: string; sub: string; cta: string; foot: string }> = {
+  login: {
+    title: "Welcome back",
+    sub: "Sign in to continue to your workspace",
+    cta: "Sign in",
+    foot: `Don't have an account? <a href="#">Sign up</a>`,
+  },
+  register: {
+    title: "Create Account",
+    sub: "Start building — it only takes a minute",
+    cta: "Create account",
+    foot: `Already have an account? <a href="#">Sign in</a>`,
+  },
+  forgot: {
+    title: "Reset Password",
+    sub: "Enter your email and we'll send you a reset link",
+    cta: "Send reset link",
+    foot: `<a href="#">← Back to login</a>`,
+  },
+};
+
+const GITHUB_SVG = `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="currentColor"><path d="M12 2C6.48 2 2 6.58 2 12.25c0 4.53 2.87 8.37 6.84 9.73.5.1.68-.22.68-.49 0-.24-.01-.87-.01-1.71-2.78.62-3.37-1.38-3.37-1.38-.46-1.19-1.11-1.5-1.11-1.5-.91-.64.07-.62.07-.62 1 .07 1.53 1.06 1.53 1.06.9 1.58 2.36 1.12 2.94.85.09-.67.35-1.12.63-1.38-2.22-.26-4.56-1.14-4.56-5.07 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.3.1-2.71 0 0 .84-.28 2.75 1.05a9.3 9.3 0 0 1 5 0c1.91-1.33 2.75-1.05 2.75-1.05.55 1.41.2 2.45.1 2.71.64.72 1.03 1.63 1.03 2.75 0 3.94-2.34 4.81-4.57 5.06.36.32.68.94.68 1.9 0 1.37-.01 2.48-.01 2.82 0 .27.18.6.69.49A10.02 10.02 0 0 0 22 12.25C22 6.58 17.52 2 12 2Z"/></svg>`;
+
+// renderAuthForm draws a real, centered SaaS auth card. It adapts to the variant:
+//  - login    → email + password, remember me + forgot link, social sign-in;
+//  - register → name + email + password + confirm, terms checkbox, social;
+//  - forgot   → email only, "Send reset link", a success note, back-to-login.
+// Returns just the card; the caller supplies the centering/gradient wrapper.
+function renderAuthForm(section: SchemaSection, brand: string, variant: AuthVariant = "login"): string {
+  const copy = AUTH_COPY[variant];
   const initial = esc((brand.match(/[A-Za-z0-9]/)?.[0] ?? "D").toUpperCase());
-  const fields =
-    section.fields && section.fields.length
-      ? section.fields
-      : [
-          { label: "Email", type: "email", hint: "you@company.com" },
-          { label: "Password", type: "password", hint: "••••••••" },
-        ];
+  const fields = section.fields && section.fields.length ? section.fields : AUTH_FIELDS[variant];
   const inputs = fields
     .map((f) => {
       const isPwd = /password/i.test(`${f.type ?? ""} ${f.label ?? ""}`);
@@ -599,24 +645,49 @@ function renderAuthForm(section: SchemaSection, brand: string): string {
       return `<label class="af-field"><span class="af-label">${esc(f.label)}</span>${inner}</label>`;
     })
     .join("");
-  const links = section.actions ?? [];
-  const forgot = esc(links[0] || "Forgot password?");
+
+  const secondaryRow =
+    variant === "login"
+      ? `<div class="auth-row">
+          <label class="af-check"><input type="checkbox" checked /> <span>Remember me</span></label>
+          <a class="af-forgot" href="#">${esc((section.actions ?? [])[0] || "Forgot password?")}</a>
+        </div>`
+      : variant === "register"
+        ? `<label class="af-check af-terms"><input type="checkbox" /> <span>I agree to the <a href="#">Terms &amp; Conditions</a></span></label>`
+        : "";
+
+  const social =
+    variant === "forgot"
+      ? ""
+      : `<div class="auth-divider"><span>or continue with</span></div>
+        <div class="auth-social">
+          <button class="ghost af-google" type="button">${GOOGLE_SVG}<span>Google</span></button>
+          <button class="ghost af-github" type="button">${GITHUB_SVG}<span>GitHub</span></button>
+        </div>`;
+
+  const success =
+    variant === "forgot"
+      ? `<div class="auth-note"><span class="auth-note-ico">${icon("check")}</span><span>Reset link sent — check your inbox.</span></div>`
+      : "";
+
+  const title = esc(section.title ?? copy.title);
+  const sub = esc(section.subtitle ?? copy.sub);
+  const cta = esc(section.primaryAction ?? section.submitLabel ?? copy.cta);
+  const foot = (section.actions ?? [])[1] ? esc((section.actions ?? [])[1]) : copy.foot;
+
   return `
     <div class="auth-card">
       <div class="auth-brand"><span class="auth-mark">${initial}</span></div>
-      <h1 class="auth-title">${esc(section.title ?? "Welcome back")}</h1>
-      ${section.subtitle ? `<p class="auth-sub">${esc(section.subtitle)}</p>` : `<p class="auth-sub">Sign in to continue to your workspace</p>`}
+      <h1 class="auth-title">${title}</h1>
+      <p class="auth-sub">${sub}</p>
       <form class="auth-form" onsubmit="return false">
         ${inputs}
-        <div class="auth-row">
-          <label class="af-check"><input type="checkbox" checked /> <span>Remember me</span></label>
-          <a class="af-forgot" href="#">${forgot}</a>
-        </div>
-        <button class="primary af-submit" type="submit">${esc(section.primaryAction ?? section.submitLabel ?? "Sign in")}</button>
+        ${secondaryRow}
+        <button class="primary af-submit" type="submit">${cta}</button>
       </form>
-      <div class="auth-divider"><span>or</span></div>
-      <button class="ghost af-google" type="button">${GOOGLE_SVG}<span>Continue with Google</span></button>
-      <p class="auth-foot">${links[1] ? esc(links[1]) : `Don't have an account? <a href="#">Sign up</a>`}</p>
+      ${success}
+      ${social}
+      <p class="auth-foot">${foot}</p>
     </div>`;
 }
 
@@ -1025,7 +1096,7 @@ function renderSection(section: SchemaSection): string {
 function wantsShell(schema: PageSchema): boolean {
   const layout = (schema.layout ?? "").toLowerCase();
   const pageType = (schema.pageType ?? "").toLowerCase();
-  if (pageType === "login") return false;
+  if (pageType === "login" || pageType === "register" || pageType === "forgot") return false;
   if (layout.includes("centered") || layout.includes("auth") || layout.includes("blank")) return false;
   return true;
 }
@@ -1243,9 +1314,12 @@ export function renderPreview(schema: PageSchema, opts: PreviewOptions = {}): st
   const authSection =
     (schema.sections ?? []).find((s) => s.type === "authForm") ??
     (schema.sections ?? []).find((s) => s.type === "formSection");
+  const authType = (schema.pageType ?? "").toLowerCase();
   const isAuthPage =
     !shell &&
-    ((schema.pageType ?? "").toLowerCase() === "login" ||
+    (authType === "login" ||
+      authType === "register" ||
+      authType === "forgot" ||
       (schema.sections ?? []).some((s) => s.type === "authForm"));
 
   const body = shell && wantsTopNav(schema)
@@ -1278,6 +1352,7 @@ export function renderPreview(schema: PageSchema, opts: PreviewOptions = {}): st
       ? `<main class="auth-page">${renderAuthForm(
           authSection ?? { type: "authForm", title: schema.title },
           opts.brand?.trim() || schema.title || "DashboardCraft",
+          authVariant(authType),
         )}</main>`
       : `<main class="page solo">
     ${head}
@@ -1487,7 +1562,12 @@ td.empty{text-align:center;color:var(--muted-fg);padding:26px}
 .af-submit{width:100%;justify-content:center;margin-top:4px;padding:11px}
 .auth-divider{display:flex;align-items:center;gap:12px;color:var(--muted-fg);font-size:12px;margin:18px 0}
 .auth-divider::before,.auth-divider::after{content:"";height:1px;flex:1;background:var(--border)}
-.af-google{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:11px}
+.af-google,.af-github{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:11px}
+.auth-social{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.af-terms{align-items:flex-start;margin:2px 0 2px;font-size:13px}
+.af-terms a{color:var(--primary);font-weight:600;text-decoration:none}
+.auth-note{display:flex;align-items:center;gap:9px;margin:14px 0 0;padding:10px 12px;border-radius:calc(var(--radius));background:color-mix(in srgb,var(--primary) 9%,var(--card));color:var(--fg);font-size:13px;font-weight:500}
+.auth-note-ico{display:inline-flex;color:var(--primary)}
 .auth-foot{margin:18px 0 0;text-align:center;font-size:13px;color:var(--muted-fg)}
 .auth-foot a{color:var(--primary);font-weight:600;text-decoration:none}
 /* No default images: CSS initials avatars + branded gradient media */

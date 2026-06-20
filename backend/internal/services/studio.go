@@ -43,6 +43,8 @@ var allowedInputPageTypes = map[string]bool{
 	"form":      true,
 	"detail":    true,
 	"login":     true,
+	"register":  true,
+	"forgot":    true,
 	"analytics": true,
 }
 
@@ -71,7 +73,6 @@ var allowedOutputModes = map[string]bool{
 type CreateProjectInput struct {
 	Name             string `json:"name"`
 	Description      string `json:"description"`
-	Domain           string `json:"domain"`
 	DefaultThemeSlug string `json:"defaultThemeSlug"`
 }
 
@@ -83,7 +84,6 @@ type CreatePageInput struct {
 type UpdateProjectInput struct {
 	Name             string `json:"name"`
 	Description      string `json:"description"`
-	Domain           string `json:"domain"`
 	DefaultThemeSlug string `json:"defaultThemeSlug"`
 }
 
@@ -264,7 +264,6 @@ func (s *StudioService) seedData() {
 		UserID:           defaultUserID,
 		Name:             "My First Project",
 		Description:      "Automated dashboard workspace",
-		Domain:           "hospital",
 		DefaultThemeSlug: "medical-clean",
 		CreatedAt:        time.Now().UTC(),
 		UpdatedAt:        time.Now().UTC(),
@@ -394,9 +393,6 @@ func (s *StudioService) CreateProjectForUser(ctx context.Context, userID string,
 	if len(strings.TrimSpace(input.Name)) > 100 {
 		return domain.Project{}, apperrors.Validation("name must be at most 100 characters")
 	}
-	if domainName := strings.TrimSpace(input.Domain); domainName != "" && !allowedDomains[strings.ToLower(domainName)] {
-		return domain.Project{}, apperrors.Validation("domain is not supported")
-	}
 	if themeSlug := strings.TrimSpace(input.DefaultThemeSlug); themeSlug != "" && !s.themeExists(ctx, themeSlug) {
 		return domain.Project{}, apperrors.Validation("defaultThemeSlug is not supported")
 	}
@@ -410,7 +406,6 @@ func (s *StudioService) CreateProjectForUser(ctx context.Context, userID string,
 		UserID:           userID,
 		Name:             strings.TrimSpace(input.Name),
 		Description:      strings.TrimSpace(input.Description),
-		Domain:           fallback(input.Domain, "custom"),
 		DefaultThemeSlug: fallback(input.DefaultThemeSlug, "studio-neutral"),
 		CreatedAt:        now,
 		UpdatedAt:        now,
@@ -426,9 +421,6 @@ func (s *StudioService) UpdateProjectForUser(ctx context.Context, userID string,
 	if len(strings.TrimSpace(input.Name)) > 100 {
 		return domain.Project{}, apperrors.Validation("name must be at most 100 characters")
 	}
-	if domainName := strings.TrimSpace(input.Domain); domainName != "" && !allowedDomains[strings.ToLower(domainName)] {
-		return domain.Project{}, apperrors.Validation("domain is not supported")
-	}
 	if themeSlug := strings.TrimSpace(input.DefaultThemeSlug); themeSlug != "" && !s.themeExists(ctx, themeSlug) {
 		return domain.Project{}, apperrors.Validation("defaultThemeSlug is not supported")
 	}
@@ -439,7 +431,6 @@ func (s *StudioService) UpdateProjectForUser(ctx context.Context, userID string,
 	}
 	project.Name = strings.TrimSpace(input.Name)
 	project.Description = strings.TrimSpace(input.Description)
-	project.Domain = fallback(input.Domain, project.Domain)
 	project.DefaultThemeSlug = fallback(input.DefaultThemeSlug, project.DefaultThemeSlug)
 	project.UpdatedAt = time.Now().UTC()
 
@@ -614,7 +605,7 @@ func (s *StudioService) GenerateForUser(ctx context.Context, userID string, page
 
 	started := time.Now().UTC()
 	pageType := fallback(input.PageType, page.PageType)
-	domainName := strings.ToLower(fallback(input.Domain, project.Domain))
+	domainName := strings.ToLower(strings.TrimSpace(input.Domain))
 	theme := fallback(input.ThemeSlug, project.DefaultThemeSlug)
 	outputMode := fallback(input.OutputMode, "tsx")
 
@@ -778,7 +769,7 @@ func (s *StudioService) RefineForUser(ctx context.Context, userID string, pageID
 		Status:     "queued",
 		Prompt:     strings.TrimSpace(input.Prompt),
 		PageType:   page.PageType,
-		Domain:     project.Domain,
+		Domain:     "",
 		ThemeSlug:  project.DefaultThemeSlug,
 		OutputMode: "tsx",
 		CreditCost: 1,

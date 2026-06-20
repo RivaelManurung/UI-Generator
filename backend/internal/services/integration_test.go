@@ -48,7 +48,6 @@ func TestIntegrationDatabaseAndWorkerFlow(t *testing.T) {
 	// Create project
 	project, err := studio.CreateProjectForUser(ctx, session.User.ID, CreateProjectInput{
 		Name:             "Integration Project",
-		Domain:           "hospital",
 		DefaultThemeSlug: "medical-clean",
 	})
 	if err != nil {
@@ -166,7 +165,6 @@ func TestIntegrationQueuePELRecovery(t *testing.T) {
 
 	project, err := studio.CreateProjectForUser(ctx, session.User.ID, CreateProjectInput{
 		Name:             "Recovery Project",
-		Domain:           "hospital",
 		DefaultThemeSlug: "medical-clean",
 	})
 	if err != nil {

@@ -315,7 +315,6 @@ func (r *PostgresProjectRepository) ListByUser(ctx context.Context, userID strin
 			UserID:           fromUUID(item.UserID),
 			Name:             item.Name,
 			Description:      item.Description,
-			Domain:           item.Domain,
 			DefaultThemeSlug: item.DefaultThemeSlug,
 			CreatedAt:        fromTimestamptz(item.CreatedAt),
 			UpdatedAt:        fromTimestamptz(item.UpdatedAt),
@@ -330,7 +329,6 @@ func (r *PostgresProjectRepository) Create(ctx context.Context, project domain.P
 		UserID:           toUUID(project.UserID),
 		Name:             project.Name,
 		Description:      project.Description,
-		Domain:           project.Domain,
 		DefaultThemeSlug: project.DefaultThemeSlug,
 	})
 	if err != nil {
@@ -341,7 +339,6 @@ func (r *PostgresProjectRepository) Create(ctx context.Context, project domain.P
 		UserID:           fromUUID(res.UserID),
 		Name:             res.Name,
 		Description:      res.Description,
-		Domain:           res.Domain,
 		DefaultThemeSlug: res.DefaultThemeSlug,
 		CreatedAt:        fromTimestamptz(res.CreatedAt),
 		UpdatedAt:        fromTimestamptz(res.UpdatedAt),
@@ -361,7 +358,6 @@ func (r *PostgresProjectRepository) FindOwned(ctx context.Context, userID string
 		UserID:           fromUUID(res.UserID),
 		Name:             res.Name,
 		Description:      res.Description,
-		Domain:           res.Domain,
 		DefaultThemeSlug: res.DefaultThemeSlug,
 		CreatedAt:        fromTimestamptz(res.CreatedAt),
 		UpdatedAt:        fromTimestamptz(res.UpdatedAt),
@@ -374,7 +370,6 @@ func (r *PostgresProjectRepository) UpdateOwned(ctx context.Context, userID stri
 		UserID:           toUUID(userID),
 		Name:             project.Name,
 		Description:      project.Description,
-		Domain:           project.Domain,
 		DefaultThemeSlug: project.DefaultThemeSlug,
 	})
 	if err != nil {
@@ -385,7 +380,6 @@ func (r *PostgresProjectRepository) UpdateOwned(ctx context.Context, userID stri
 		UserID:           fromUUID(res.UserID),
 		Name:             res.Name,
 		Description:      res.Description,
-		Domain:           res.Domain,
 		DefaultThemeSlug: res.DefaultThemeSlug,
 		CreatedAt:        fromTimestamptz(res.CreatedAt),
 		UpdatedAt:        fromTimestamptz(res.UpdatedAt),

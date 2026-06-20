@@ -42,7 +42,7 @@ func TestPublishFreeTemplate(t *testing.T) {
 	}()
 
 	// Generate a real page (project -> page -> saved version with schema + code).
-	project, err := studio.CreateProjectForUser(ctx, userID, CreateProjectInput{Name: "FT Project", Domain: "hospital", DefaultThemeSlug: "shadcn"})
+	project, err := studio.CreateProjectForUser(ctx, userID, CreateProjectInput{Name: "FT Project", DefaultThemeSlug: "shadcn"})
 	if err != nil {
 		t.Fatalf("create project: %v", err)
 	}

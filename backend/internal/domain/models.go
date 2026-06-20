@@ -7,7 +7,6 @@ type Project struct {
 	UserID           string    `json:"userId,omitempty"`
 	Name             string    `json:"name"`
 	Description      string    `json:"description"`
-	Domain           string    `json:"domain"`
 	Status           string    `json:"status,omitempty"`
 	DefaultThemeSlug string    `json:"defaultThemeSlug"`
 	CreatedAt        time.Time `json:"createdAt"`

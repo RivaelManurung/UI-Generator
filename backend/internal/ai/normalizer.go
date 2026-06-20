@@ -20,8 +20,12 @@ func NormalizeIntent(prompt string, fallbackPageType string, fallbackDomain stri
 		Domain:   fallback(fallbackDomain, "custom"),
 	}
 	switch {
-	case strings.Contains(trimmed, "login") || strings.Contains(trimmed, "sign in"):
+	case strings.Contains(trimmed, "login") || strings.Contains(trimmed, "sign in") || strings.Contains(trimmed, "masuk"):
 		intent.PageType = "login"
+	case strings.Contains(trimmed, "register") || strings.Contains(trimmed, "sign up") || strings.Contains(trimmed, "signup") || strings.Contains(trimmed, "daftar"):
+		intent.PageType = "register"
+	case strings.Contains(trimmed, "forgot password") || strings.Contains(trimmed, "reset password") || strings.Contains(trimmed, "password reset") || strings.Contains(trimmed, "lupa password") || strings.Contains(trimmed, "lupa kata sandi"):
+		intent.PageType = "forgot"
 	case strings.Contains(trimmed, "form"):
 		intent.PageType = "form"
 	case strings.Contains(trimmed, "detail") || strings.Contains(trimmed, "profile"):

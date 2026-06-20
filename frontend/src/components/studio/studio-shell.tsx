@@ -47,6 +47,8 @@ import {
 
 import { StudioHeader } from "./studio-header";
 import { PromptExamples } from "./prompt-examples";
+import { GenerationProgress } from "./generation-progress";
+import { resolveLayoutKind } from "@/lib/generation/layout-kind";
 import { PromptInputBox } from "./prompt-input-box";
 import { DeviceSwitcher } from "./device-switcher";
 import { ScreenPreview, type ScreenCard } from "./screen-preview";
@@ -152,6 +154,8 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
   const [isChatOpen, setIsChatOpen] = useState(true);
   const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  // The prompt captured at the moment generation started, shown in the progress panel.
+  const [submittedPrompt, setSubmittedPrompt] = useState("");
   const [isThemeOpen, setIsThemeOpen] = useState(false);
   const [isCodeOpen, setIsCodeOpen] = useState(false);
   const [isFilesOpen, setIsFilesOpen] = useState(false);
@@ -207,7 +211,6 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
     const created = await createProject({
       name: prompt.trim().slice(0, 60) || "My first dashboard",
       description: "",
-      domain: "General",
       status: "draft",
       defaultThemeSlug: selectedThemeSlug,
     });
@@ -220,6 +223,7 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
   // its `active` state — so generation keeps running across /app navigation.
   const runGeneration = useCallback(async () => {
     if (active) return;
+    setSubmittedPrompt(prompt);
     // Lock the preview to the theme this generation uses, from the moment it starts.
     genThemeRef.current = selectedThemeSlug;
     setGeneratedThemeSlug(selectedThemeSlug);
@@ -233,7 +237,6 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
         const created = await createProject({
           name: prompt.trim().slice(0, 60) || "My dashboard",
           description: "",
-          domain: "General",
           status: "draft",
           defaultThemeSlug: selectedThemeSlug,
         });
@@ -350,7 +353,6 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
     createProject({
       name,
       description,
-      domain: "General",
       status: "draft",
       defaultThemeSlug: selectedThemeSlug,
     })
@@ -457,7 +459,17 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
             <>
               <ScrollArea className="flex-1">
                 <div className="space-y-4 p-3">
-                  <PromptExamples onSelectPrompt={(text) => setPrompt(text)} />
+                  {isGeneratingThisProject ? (
+                    <GenerationProgress
+                      prompt={submittedPrompt || prompt}
+                      kind={resolveLayoutKind(submittedPrompt || prompt, active?.pages?.[0]?.pageType)}
+                      completed={active?.completed ?? 0}
+                      total={active?.total ?? 0}
+                      failed={active?.status === "failed"}
+                    />
+                  ) : (
+                    <PromptExamples onSelectPrompt={(text) => setPrompt(text)} />
+                  )}
                 </div>
               </ScrollArea>
 
@@ -582,6 +594,7 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
                 generating={isGeneratingThisProject}
                 completed={active?.completed}
                 total={active?.total}
+                buildKind={resolveLayoutKind(submittedPrompt || prompt, active?.pages?.[0]?.pageType)}
               />
             ) : (
               <EmptyPreview

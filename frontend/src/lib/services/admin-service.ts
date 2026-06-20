@@ -16,7 +16,6 @@ export type AnalyticsPoint = {
 export type AdminProject = {
   id: string;
   name: string;
-  domain: string;
   status: "active" | "draft" | "archived";
   owner: string;
   ownerEmail: string;

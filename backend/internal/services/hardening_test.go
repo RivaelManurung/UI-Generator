@@ -71,7 +71,7 @@ func TestDeleteProject_NotOwnedReturnsNotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("register other: %v", err)
 	}
-	project, err := studio.CreateProjectForUser(ctx, owner.User.ID, CreateProjectInput{Name: "P", Domain: "hospital", DefaultThemeSlug: "shadcn"})
+	project, err := studio.CreateProjectForUser(ctx, owner.User.ID, CreateProjectInput{Name: "P", DefaultThemeSlug: "shadcn"})
 	if err != nil {
 		t.Fatalf("create project: %v", err)
 	}
