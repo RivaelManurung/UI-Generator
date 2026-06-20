@@ -16,6 +16,8 @@ interface ThemePickerSheetProps {
   systems: DesignSystem[];
   selectedThemeSlug: string;
   onSelectTheme: (slug: string) => void;
+  /** Only show themes offered for this target (mobile projects get mobile themes). */
+  platform?: "web" | "mobile";
 }
 
 // A miniature, token-driven preview so each design system looks like itself in
@@ -66,19 +68,26 @@ export function ThemePickerSheet({
   systems,
   selectedThemeSlug,
   onSelectTheme,
+  platform = "web",
 }: ThemePickerSheetProps) {
+  // A theme is shown when it declares this platform (or declares none = both).
+  const visible = systems.filter(
+    (ds) => !ds.platforms || ds.platforms.length === 0 || ds.platforms.includes(platform),
+  );
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full border-t border-border sm:max-w-none sm:rounded-t-2xl sm:border-l-0" side="bottom">
         <SheetHeader>
-          <SheetTitle className="text-base font-semibold text-galaxy">Choose Design System</SheetTitle>
+          <SheetTitle className="text-base font-semibold text-galaxy">
+            Choose {platform === "mobile" ? "Mobile App" : "Website"} Theme
+          </SheetTitle>
           <SheetDescription className="text-xs leading-5">
             Pick the visual style for the generated project. It changes both the live preview and the exported code.
           </SheetDescription>
         </SheetHeader>
 
         <div className="mt-5 grid max-h-[40vh] grid-cols-2 gap-3 overflow-y-auto pb-4 pr-1 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7">
-          {systems.map((ds) => {
+          {visible.map((ds) => {
             const isActive = selectedThemeSlug === ds.slug;
             const isDisabled = ds.status === "soon";
 

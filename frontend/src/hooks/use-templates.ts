@@ -8,6 +8,8 @@ export interface Template {
   componentHint: number;
   tier: "Free" | "Premium";
   description: string;
+  /** Generation target the Studio pre-selects: "web" (default) or "mobile". */
+  platform?: "web" | "mobile";
 }
 
 export async function getTemplates(): Promise<Template[]> {

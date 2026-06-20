@@ -23,6 +23,8 @@ export type GenerationBatch = {
   completed: number;
   pages: GeneratedPage[];
   error?: string;
+  /** Live HTML-so-far of a code-gen screen being written (Stitch-style build). */
+  streamHtml?: string;
 };
 
 interface GenerationContextValue {
@@ -39,6 +41,29 @@ interface GenerationContextValue {
 }
 
 const POLL_INTERVAL_MS = 2500;
+
+// A deterministic key for one generation intent: identical (project, prompt,
+// theme, count, mode) requests share a key, so the server dedupes retries.
+// Two independent hashes over the FULL seed give a ~64-bit fingerprint, so
+// distinct prompts don't collide (which would silently suppress a real request).
+function stableIdemKey(
+  projectId: string,
+  prompt: string,
+  themeSlug: string,
+  pageCount: number,
+  auto: boolean,
+): string {
+  const seed = `${projectId}|${pageCount}|${auto ? "a" : "m"}|${themeSlug}|${prompt}`;
+  let h1 = 5381;
+  let h2 = 52711;
+  for (let i = 0; i < seed.length; i++) {
+    const c = seed.charCodeAt(i);
+    h1 = ((h1 << 5) + h1 + c) | 0;
+    h2 = ((h2 << 5) + h2 * 7 + c) | 0;
+  }
+  const part = (n: number) => (n >>> 0).toString(36).padStart(7, "0");
+  return `gen:${projectId}:${pageCount}:${auto ? "a" : "m"}:${part(h1)}${part(h2)}`;
+}
 
 const GenerationContext = createContext<GenerationContextValue | null>(null);
 
@@ -151,10 +176,14 @@ export function GenerationProvider({ children }: { children: ReactNode }) {
       activeRef.current = true;
 
       try {
+        // A STABLE idempotency key for THIS generation intent so a duplicate /
+        // retried request returns the same batch instead of charging credits
+        // twice. Identical re-submits within the server's 2-minute window dedupe.
+        const idemKey = stableIdemKey(projectId, prompt, themeSlug, pageCount, auto);
         const batch = await http.post<GenerationBatch>(
           `/projects/${projectId}/generate-pages`,
           { prompt, themeSlug, pageCount, auto },
-          { idempotent: true },
+          { idempotencyKey: idemKey },
         );
         setActive(batch);
         if (isTerminal(batch)) {

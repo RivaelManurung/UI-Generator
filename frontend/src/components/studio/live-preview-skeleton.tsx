@@ -63,7 +63,9 @@ export function LivePreviewSkeleton({
         aria-label={caption}
         role="img"
       >
-        {kind === "auth" ? (
+        {kind === "mobile" ? (
+          <MobileShell step={currentStep} />
+        ) : kind === "auth" ? (
           <AuthShell step={currentStep} variant={authVariantFrom(screenName, pageType)} />
         ) : (
           <AdminShell kind={kind} step={currentStep} />
@@ -170,6 +172,105 @@ function Field({ withToggle }: { withToggle?: boolean }) {
           <span className="absolute right-3 size-4 rounded bg-galaxy/10" aria-hidden />
         ) : null}
       </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Mobile shell: status bar + app bar + stacked cards + bottom tab bar */
+/* (mirrors the phone preview the renderer produces — NO sidebar)      */
+/* ------------------------------------------------------------------ */
+
+function MobileShell({ step }: { step: number }) {
+  return (
+    <div className="flex size-full flex-col bg-meteor">
+      {/* status bar */}
+      <div className="flex items-center justify-between px-5 pb-1 pt-3">
+        <Bar className="h-2.5 w-8" tone="strong" />
+        <div className="flex items-center gap-1">
+          <div className="size-2.5 rounded-sm bg-galaxy/20" />
+          <div className="size-2.5 rounded-sm bg-galaxy/20" />
+          <div className="h-2.5 w-4 rounded-sm bg-galaxy/20" />
+        </div>
+      </div>
+
+      {/* app bar */}
+      <Region revealed={step >= 1} active={step === 1}>
+        <div className="flex items-center justify-between px-5 py-3">
+          <div className="flex items-center gap-2.5">
+            <span className="grid size-8 place-items-center rounded-xl bg-planetary text-white">
+              <Sparkles className="size-4" aria-hidden />
+            </span>
+            <Bar className="h-3 w-20" tone="strong" />
+          </div>
+          <div className="size-8 rounded-full bg-galaxy/10" />
+        </div>
+      </Region>
+
+      <div className="flex flex-1 flex-col gap-4 px-5 pt-1">
+        {/* large title */}
+        <Region revealed={step >= 1} active={step === 1}>
+          <div className="space-y-2">
+            <Bar className="h-6 w-32" tone="strong" />
+            <Bar className="h-2.5 w-44" tone="faint" />
+          </div>
+        </Region>
+
+        {/* hero card */}
+        <Region revealed={step >= 2} active={step === 2}>
+          <div className="space-y-3 rounded-3xl bg-planetary/15 p-5">
+            <Bar className="h-4 w-40" tone="strong" />
+            <Bar className="h-2.5 w-full" tone="faint" />
+            <Bar className="h-2.5 w-3/4" tone="faint" />
+            <div className="flex gap-2 pt-1">
+              <div className="h-9 w-28 rounded-full bg-planetary/80" />
+              <div className="h-9 w-20 rounded-full bg-white/80" />
+            </div>
+          </div>
+        </Region>
+
+        {/* quick-action chip row */}
+        <Region revealed={step >= 3} active={step === 3}>
+          <div className="flex gap-3 overflow-hidden">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="flex w-24 shrink-0 flex-col items-center gap-2 rounded-2xl border border-galaxy/10 bg-white p-3">
+                <div className="size-9 rounded-full bg-sky/60" />
+                <Bar className="h-2 w-12" tone="faint" />
+              </div>
+            ))}
+          </div>
+        </Region>
+
+        {/* content list rows */}
+        <Region revealed={step >= 4} active={step === 4}>
+          <div className="overflow-hidden rounded-2xl border border-galaxy/10 bg-white">
+            <div className="divide-y divide-galaxy/[0.06]">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3 p-3.5">
+                  <div className="size-10 rounded-xl bg-venus/50" />
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <Bar className="h-3 w-32" tone="normal" />
+                    <Bar className="h-2.5 w-44" tone="faint" />
+                  </div>
+                  <Bar className="h-3 w-12" tone="faint" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </Region>
+      </div>
+
+      {/* bottom tab bar */}
+      <Region revealed={step >= 5} active={step >= 5}>
+        <div className="mt-2 flex items-center justify-around border-t border-galaxy/10 bg-white px-2 pb-4 pt-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="flex flex-col items-center gap-1.5">
+              <div className={cn("size-5 rounded-md", i === 0 ? "bg-planetary" : "bg-galaxy/15")} />
+              <Bar className="h-1.5 w-8" tone={i === 0 ? "strong" : "faint"} />
+            </div>
+          ))}
+        </div>
+      </Region>
     </div>
   );
 }

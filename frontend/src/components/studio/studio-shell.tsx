@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useMemo, useEffect, useCallback, useRef, FormEvent } from "react";
-import { useRouter } from "next/navigation";
-import { Copy, Code2, FolderOpen, History, Wrench, Menu, PanelLeftClose, PanelLeftOpen, Plus, Download, Gift, Palette, ChevronDown, MoreHorizontal } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Copy, Code2, FolderOpen, History, Wrench, Menu, PanelLeftClose, PanelLeftOpen, Plus, Download, Gift, Palette, ChevronDown, MoreHorizontal, Monitor, Smartphone } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
 import { useProjects } from "@/hooks/use-projects";
+import type { ProjectPlatform } from "@/types/project";
 import { useCreditBalance } from "@/hooks/use-credit-balance";
 import { useGenerationVersions } from "@/hooks/use-generation-versions";
 import { useGeneration } from "@/components/app/generation-provider";
@@ -60,11 +61,17 @@ import { CodeViewerDialog } from "./code-viewer-dialog";
 import { ProjectFilesSheet } from "./project-files-sheet";
 import { VersionHistoryPanel } from "./version-history-panel";
 import { RefineSectionPanel } from "./refine-section-panel";
-import { renderPreview } from "@/lib/generation/preview-compiler";
+import { renderPreview, codeGenStreamShell } from "@/lib/generation/preview-compiler";
+
+const PLATFORM_OPTIONS: { value: ProjectPlatform; title: string; hint: string; icon: typeof Monitor }[] = [
+  { value: "web", title: "Website", hint: "Sidebar, multi-column", icon: Monitor },
+  { value: "mobile", title: "Mobile App", hint: "Single column, tab bar", icon: Smartphone },
+];
 
 export default function StudioShell({ routeProjectId }: { routeProjectId?: string }) {
   const { projects, createProject } = useProjects();
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const searchParams = useSearchParams();
 
   // The studio opens CLEAN (Stitch-like) for the generic "/app/studio/demo" entry.
   // BUT when navigated to a REAL project id (e.g. "Open studio" on a saved project),
@@ -80,16 +87,34 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
     }
   }, [routeProjectId, projects, activeProjectId]);
 
-  // On a clean entry (the generic "/app/studio/demo" with no adopted project),
-  // offer to create a new project or open an existing one. Dismissible.
+  // On a clean entry (the generic "/app/studio/demo" with no adopted project):
+  //  - If we arrived from a template ("Use template" passes ?prompt=&name=&platform=),
+  //    pre-fill the brief + open the Create Project dialog primed with that target.
+  //  - Otherwise offer to create a new project or open an existing one.
+  // Dismissible either way.
   useEffect(() => {
-    if (!activeProjectId && (!routeProjectId || routeProjectId === "demo")) {
-      setIsStartOpen(true);
+    if (activeProjectId || (routeProjectId && routeProjectId !== "demo")) return;
+
+    const tplPrompt = searchParams.get("prompt");
+    const tplName = searchParams.get("name");
+    const tplPlatform = searchParams.get("platform");
+
+    if (tplPrompt || tplName) {
+      if (tplPrompt) setPrompt(tplPrompt);
+      if (tplName) setNewProjectName(tplName);
+      if (tplPlatform === "mobile") setNewPlatform("mobile");
+      setIsCreateProjectOpen(true);
+      return;
     }
+    setIsStartOpen(true);
   }, []); // run once on mount
 
   const currentProject =
     projects.find((p) => p.id === activeProjectId) ?? { id: "", name: "Untitled project" };
+  // Mobile-app projects preview inside a phone mockup and hide the website
+  // Desktop/Tablet/Mobile responsive switcher (those are for website testing).
+  const isMobileProject =
+    projects.find((p) => p.id === activeProjectId)?.platform === "mobile";
 
   const router = useRouter();
   const isAdmin = useIsAdmin();
@@ -165,6 +190,12 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
   const [isStartOpen, setIsStartOpen] = useState(false);
   const [boostPrompt, setBoostPrompt] = useState(true);
 
+  // Create-project dialog is controlled so a template handoff (or an explicit
+  // platform pick) can pre-fill the name and the Website / Mobile App target.
+  const [newProjectName, setNewProjectName] = useState("");
+  const [newProjectDesc, setNewProjectDesc] = useState("");
+  const [newPlatform, setNewPlatform] = useState<ProjectPlatform>("web");
+
   const selectedTheme = designSystemBySlug(designSystems, selectedThemeSlug);
   // NOTE: the design system styles the GENERATED output (preview canvas + exported
   // code) only — NOT the studio's own chrome, which stays neutral on purpose.
@@ -213,10 +244,11 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
       description: "",
       status: "draft",
       defaultThemeSlug: selectedThemeSlug,
+      platform: newPlatform,
     });
     setActiveProjectId(created.id);
     return created.id;
-  }, [currentProject.id, createProject, prompt, selectedThemeSlug]);
+  }, [currentProject.id, createProject, prompt, selectedThemeSlug, newPlatform]);
 
   // Fire a background generation through the global provider. The provider
   // polls the batch, toasts on completion, and the overlay below is driven by
@@ -239,6 +271,7 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
           description: "",
           status: "draft",
           defaultThemeSlug: selectedThemeSlug,
+          platform: newPlatform,
         });
         setActiveProjectId(created.id);
         await start(created.id, prompt, selectedThemeSlug, pageCount, auto);
@@ -246,7 +279,7 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
         toast.error(err instanceof Error ? err.message : "Generation failed. Please try again.");
       }
     }
-  }, [active, ensureProjectId, createProject, prompt, selectedThemeSlug, pageCount, auto, start]);
+  }, [active, ensureProjectId, createProject, prompt, selectedThemeSlug, pageCount, auto, start, newPlatform]);
 
   // Build the multi-screen canvas (Stitch-like): every page renders as its own
   // card. While a generation is running, completed pages stream in from the live
@@ -282,6 +315,13 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
     return cards;
   }, [isGeneratingThisProject, active, pages, currentProject.name, generatedThemeSlug, designSystems]);
 
+  // Stable shell doc for the live code-gen streaming preview (theme-tokened). Set
+  // once as the iframe srcDoc; the growing HTML is postMessaged in (no reload).
+  const streamShell = useMemo(
+    () => codeGenStreamShell({ designSystem: designSystemBySlug(designSystems, generatedThemeSlug) }),
+    [designSystems, generatedThemeSlug],
+  );
+
   // Re-fetch the current project's pages (used after refine / restore).
   const refreshPages = useCallback(async () => {
     if (!currentProject.id) return;
@@ -309,6 +349,11 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
       setSelectedThemeSlug(proj.defaultThemeSlug);
       setGeneratedThemeSlug(proj.defaultThemeSlug);
       genThemeRef.current = proj.defaultThemeSlug;
+      // Adopt the project's target so further generations stay on-platform, and
+      // default the preview to a phone frame for mobile projects.
+      const platform: ProjectPlatform = proj.platform === "mobile" ? "mobile" : "web";
+      setNewPlatform(platform);
+      setDevice(platform === "mobile" ? "mobile390" : "desktop1440");
     }
   }, [activeProjectId, projects]);
 
@@ -345,9 +390,8 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
 
   function handleCreateProject(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const form = new FormData(e.currentTarget);
-    const name = String(form.get("name") ?? "").trim();
-    const description = String(form.get("description") ?? "").trim();
+    const name = newProjectName.trim();
+    const description = newProjectDesc.trim();
     if (!name) return;
 
     createProject({
@@ -355,13 +399,20 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
       description,
       status: "draft",
       defaultThemeSlug: selectedThemeSlug,
+      platform: newPlatform,
     })
       .then((created) => {
         setActiveProjectId(created.id);
-        setPrompt("");
+        // NOTE: we intentionally KEEP the prompt — a template handoff pre-fills it,
+        // so the user can generate immediately after creating the container.
         setPages([]);
         setSelectedSlug(null);
         setIsCreateProjectOpen(false);
+        // A mobile project previews in a phone frame by default.
+        if (newPlatform === "mobile") setDevice("mobile390");
+        // Reset the dialog fields for the next open.
+        setNewProjectName("");
+        setNewProjectDesc("");
       })
       .catch((err) => {
         toast.error(err instanceof Error ? err.message : "Could not create project");
@@ -462,13 +513,16 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
                   {isGeneratingThisProject ? (
                     <GenerationProgress
                       prompt={submittedPrompt || prompt}
-                      kind={resolveLayoutKind(submittedPrompt || prompt, active?.pages?.[0]?.pageType)}
+                      kind={isMobileProject ? "mobile" : resolveLayoutKind(submittedPrompt || prompt, active?.pages?.[0]?.pageType)}
                       completed={active?.completed ?? 0}
                       total={active?.total ?? 0}
                       failed={active?.status === "failed"}
                     />
                   ) : (
-                    <PromptExamples onSelectPrompt={(text) => setPrompt(text)} />
+                    <PromptExamples
+                      onSelectPrompt={(text) => setPrompt(text)}
+                      platform={isMobileProject ? "mobile" : "web"}
+                    />
                   )}
                 </div>
               </ScrollArea>
@@ -508,7 +562,14 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
         <section className="flex h-[calc(100svh-3.5rem)] min-w-0 flex-col overflow-hidden">
           {/* Studio Actions Bar */}
           <div className="flex min-h-14 items-center justify-between gap-3 border-b border-border bg-background px-3 overflow-x-auto">
-            <DeviceSwitcher device={device} onChangeDevice={setDevice} />
+            {isMobileProject ? (
+              <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary">
+                <Smartphone className="h-3.5 w-3.5" />
+                Mobile app preview
+              </span>
+            ) : (
+              <DeviceSwitcher device={device} onChangeDevice={setDevice} />
+            )}
 
             <div className="flex shrink-0 items-center gap-1.5">
               {/* Primary creative action stays one click away. */}
@@ -591,10 +652,13 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
                 onRegenerate={(key) => setManage({ kind: "regenerate", key })}
                 onDelete={(key) => setManage({ kind: "delete", key })}
                 device={device}
+                phone={isMobileProject}
                 generating={isGeneratingThisProject}
                 completed={active?.completed}
                 total={active?.total}
-                buildKind={resolveLayoutKind(submittedPrompt || prompt, active?.pages?.[0]?.pageType)}
+                buildKind={isMobileProject ? "mobile" : resolveLayoutKind(submittedPrompt || prompt, active?.pages?.[0]?.pageType)}
+                streamHtml={isGeneratingThisProject ? active?.streamHtml : undefined}
+                streamShell={streamShell}
               />
             ) : (
               <EmptyPreview
@@ -630,6 +694,7 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
         systems={designSystems}
         selectedThemeSlug={selectedThemeSlug}
         onSelectTheme={handleSelectTheme}
+        platform={isMobileProject ? "mobile" : "web"}
       />
 
       <CodeViewerDialog
@@ -728,14 +793,64 @@ export default function StudioShell({ routeProjectId }: { routeProjectId?: strin
           </DialogHeader>
 
           <form onSubmit={handleCreateProject} className="grid gap-4">
+            <div className="grid gap-2 text-xs font-bold">
+              What are you building?
+              <div className="grid grid-cols-2 gap-2">
+                {PLATFORM_OPTIONS.map((opt) => {
+                  const active = newPlatform === opt.value;
+                  const Icon = opt.icon;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setNewPlatform(opt.value)}
+                      aria-pressed={active}
+                      className={`flex items-center gap-2.5 rounded-xl border p-3 text-left transition ${
+                        active
+                          ? "border-primary bg-primary/5 ring-1 ring-primary"
+                          : "border-border hover:border-primary/40"
+                      }`}
+                    >
+                      <span
+                        className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${
+                          active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        <Icon className="h-4 w-4" />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-bold text-foreground">{opt.title}</span>
+                        <span className="block text-[11px] font-medium text-muted-foreground">{opt.hint}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <label className="grid gap-2 text-xs font-bold" htmlFor="new-project-name">
               Project Name
-              <Input id="new-project-name" name="name" placeholder="Hospital Ops Dashboard" required autoFocus />
+              <Input
+                id="new-project-name"
+                name="name"
+                value={newProjectName}
+                onChange={(e) => setNewProjectName(e.target.value)}
+                placeholder={newPlatform === "mobile" ? "Delivery Rider App" : "Hospital Ops Dashboard"}
+                required
+                autoFocus
+              />
             </label>
 
             <label className="grid gap-2 text-xs font-bold" htmlFor="new-project-desc">
               Description <span className="font-normal text-muted-foreground">(optional)</span>
-              <Textarea id="new-project-desc" className="min-h-20 resize-none rounded-xl" name="description" placeholder="Brief description of your project..." />
+              <Textarea
+                id="new-project-desc"
+                className="min-h-20 resize-none rounded-xl"
+                name="description"
+                value={newProjectDesc}
+                onChange={(e) => setNewProjectDesc(e.target.value)}
+                placeholder="Brief description of your project..."
+              />
             </label>
 
             <div className="grid grid-cols-2 gap-2 pt-2">

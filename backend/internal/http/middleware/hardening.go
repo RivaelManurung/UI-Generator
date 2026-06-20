@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -78,6 +79,12 @@ type RateLimiter struct {
 	client *redis.Client
 	limit  int
 	window time.Duration
+	// failOpen controls behaviour when Redis is unavailable. When true (default)
+	// the limiter degrades GRACEFULLY to its in-memory counter (still bounded, so
+	// requests aren't unlimited and dev isn't blocked). When false it fails CLOSED
+	// (denies) — stricter for production financial endpoints. Set via
+	// RATE_LIMIT_FAIL_OPEN=false.
+	failOpen bool
 
 	mu       sync.Mutex
 	attempts map[string]rateEntry
@@ -94,15 +101,18 @@ func NewRateLimiter(client *redis.Client, limit int, window time.Duration) *Rate
 		client:   client,
 		limit:    limit,
 		window:   window,
+		failOpen: !strings.EqualFold(strings.TrimSpace(os.Getenv("RATE_LIMIT_FAIL_OPEN")), "false"),
 		attempts: map[string]rateEntry{},
 		stopChan: make(chan struct{}),
 	}
-	if client == nil {
-		go rl.startCleanupLoop(10 * time.Second)
-	}
+	// The in-memory counter backs BOTH the no-Redis mode and the graceful
+	// degradation path when Redis errors, so keep its cleanup loop running always.
+	go rl.startCleanupLoop(10 * time.Second)
 	return rl
 }
 
+// Close stops the background cleanup loop. Used by tests to avoid goroutine
+// leaks; the app keeps a single limiter alive for its whole lifetime.
 func (r *RateLimiter) Close() {
 	if r.stopChan != nil {
 		close(r.stopChan)
@@ -151,12 +161,18 @@ func (r *RateLimiter) allow(ctx context.Context, key string) bool {
 	if r.client != nil {
 		count, err := r.client.Incr(ctx, "ratelimit:"+key).Result()
 		if err != nil {
-			return true // fail open
+			// Redis unavailable. Fail CLOSED in strict mode; otherwise degrade to
+			// the in-memory limiter below (still bounded — NOT unlimited).
+			if !r.failOpen {
+				return false
+			}
+			// fall through to in-memory limiting
+		} else {
+			if count == 1 {
+				r.client.Expire(ctx, "ratelimit:"+key, r.window)
+			}
+			return int(count) <= r.limit
 		}
-		if count == 1 {
-			r.client.Expire(ctx, "ratelimit:"+key, r.window)
-		}
-		return int(count) <= r.limit
 	}
 
 	r.mu.Lock()

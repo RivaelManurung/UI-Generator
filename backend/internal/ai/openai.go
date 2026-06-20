@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -11,6 +12,8 @@ import (
 	"math"
 	"math/rand"
 	"net/http"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -44,8 +47,27 @@ func NewOpenAIProvider(apiKey, baseURL, model string) *OpenAIProvider {
 		// Reasoning models (MiniMax-M3) generating a full multi-page app in one
 		// call can run well past 60s; the per-request ctx still bounds the inline
 		// route, so this only raises the ceiling for the background batch path.
-		httpClient: &http.Client{Timeout: 240 * time.Second},
+		// Configurable via OPENAI_TIMEOUT_SECONDS (default 180s) so slow/fast
+		// gateways can be tuned without a rebuild.
+		httpClient: &http.Client{Timeout: openAITimeout()},
 	}
+}
+
+// openAITimeout reads OPENAI_TIMEOUT_SECONDS (default 180s, clamped 30-600s).
+func openAITimeout() time.Duration {
+	secs := 180
+	if v := strings.TrimSpace(os.Getenv("OPENAI_TIMEOUT_SECONDS")); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			secs = n
+		}
+	}
+	if secs < 30 {
+		secs = 30
+	}
+	if secs > 600 {
+		secs = 600
+	}
+	return time.Duration(secs) * time.Second
 }
 
 type oaiMessage struct {
@@ -58,6 +80,7 @@ type oaiRequest struct {
 	Messages    []oaiMessage `json:"messages"`
 	Temperature float64      `json:"temperature"`
 	MaxTokens   int          `json:"max_tokens,omitempty"`
+	Stream      bool         `json:"stream,omitempty"`
 }
 
 type oaiResponse struct {
@@ -71,7 +94,7 @@ type oaiResponse struct {
 	} `json:"error,omitempty"`
 }
 
-func (p *OpenAIProvider) complete(ctx context.Context, systemPrompt, userPrompt string, temperature float64) (string, error) {
+func (p *OpenAIProvider) complete(ctx context.Context, systemPrompt, userPrompt string, temperature float64, maxTokens int) (string, error) {
 	var err error
 	defer func() {
 		if err != nil {
@@ -88,10 +111,21 @@ func (p *OpenAIProvider) complete(ctx context.Context, systemPrompt, userPrompt 
 		temperature = 1.0
 	}
 
+	// Token budget per call. IMPORTANT: a reasoning model (MiniMax-M3) spends a
+	// large part of the budget on a hidden <think> block BEFORE the JSON, so the
+	// ceiling must be generous or the actual JSON gets truncated → invalid → a
+	// costly retry. The ceiling is not a target: a model that finishes early stops
+	// early, so a high ceiling does NOT slow it down — it only prevents truncation.
+	if maxTokens <= 0 {
+		maxTokens = 32768
+	}
+	if maxTokens > 32768 {
+		maxTokens = 32768
+	}
 	reqBody := oaiRequest{
 		Model:       p.model,
 		Temperature: temperature, // rolled per call by the variation engine; a calmer retry recovers any malformed JSON
-		MaxTokens:   32768,       // multi-page JSON is long, and reasoning models (MiniMax-M3) also spend tokens on a <think> block — 8192 truncated 3-page output into broken JSON
+		MaxTokens:   maxTokens,
 		Messages: []oaiMessage{
 			{Role: "system", Content: systemPrompt},
 			{Role: "user", Content: userPrompt},
@@ -104,7 +138,10 @@ func (p *OpenAIProvider) complete(ctx context.Context, systemPrompt, userPrompt 
 
 	url := p.baseURL + "/chat/completions"
 	var lastErr error
-	const maxRetries = 2
+	// One initial try + one calm retry. The caller (GenerateSchema/GenerateApp)
+	// adds its own outer variation retry, so a deeper nested retry here just
+	// multiplies latency on a slow reasoning model for little extra resilience.
+	const maxRetries = 1
 
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		if cerr := ctx.Err(); cerr != nil {
@@ -169,6 +206,100 @@ func (p *OpenAIProvider) complete(ctx context.Context, systemPrompt, userPrompt 
 	return "", err
 }
 
+// completeStream runs a streaming chat completion (Server-Sent Events). It
+// accumulates the delta content and invokes onChunk(accumulated) as tokens
+// arrive, returning the full text. Bounded by ctx (no client total timeout, so
+// a long stream isn't cut off mid-generation). No retries — the caller falls
+// back to the non-streaming path on error.
+func (p *OpenAIProvider) completeStream(ctx context.Context, systemPrompt, userPrompt string, temperature float64, maxTokens int, onChunk func(accumulated string)) (string, error) {
+	if temperature <= 0 {
+		temperature = 0.7
+	}
+	if temperature > 1.0 {
+		temperature = 1.0
+	}
+	reqBody := oaiRequest{
+		Model:       p.model,
+		Temperature: temperature,
+		MaxTokens:   maxTokens,
+		Stream:      true,
+		Messages: []oaiMessage{
+			{Role: "system", Content: systemPrompt},
+			{Role: "user", Content: userPrompt},
+		},
+	}
+	bodyBytes, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", err
+	}
+	req, err := http.NewRequestWithContext(ctx, "POST", p.baseURL+"/chat/completions", bytes.NewReader(bodyBytes))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+p.apiKey)
+	req.Header.Set("Accept", "text/event-stream")
+
+	// Streaming spans the whole generation; rely on ctx (not a client timeout).
+	streamClient := &http.Client{}
+	resp, err := streamClient.Do(req)
+	if err != nil {
+		metrics.IncAIFailure()
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
+		metrics.IncAIFailure()
+		return "", fmt.Errorf("AI provider stream returned status %d: %s", resp.StatusCode, string(b))
+	}
+
+	var sb strings.Builder
+	reader := bufio.NewReader(resp.Body)
+	for {
+		if ctx.Err() != nil {
+			return sb.String(), ctx.Err()
+		}
+		line, rerr := reader.ReadString('\n')
+		if s := strings.TrimSpace(line); strings.HasPrefix(s, "data:") {
+			data := strings.TrimSpace(s[5:])
+			if data == "[DONE]" {
+				return sb.String(), nil
+			}
+			var chunk struct {
+				Choices []struct {
+					FinishReason *string `json:"finish_reason"`
+					Delta        struct {
+						Content string `json:"content"`
+					} `json:"delta"`
+				} `json:"choices"`
+			}
+			if json.Unmarshal([]byte(data), &chunk) == nil {
+				// A terminal chunk has empty choices (just usage) — the stream is
+				// done even if the server never sends an explicit [DONE] and keeps
+				// the connection open (which would otherwise block ReadString).
+				if len(chunk.Choices) == 0 {
+					return sb.String(), nil
+				}
+				if c := chunk.Choices[0].Delta.Content; c != "" {
+					sb.WriteString(c)
+					if onChunk != nil {
+						onChunk(sb.String())
+					}
+				}
+				// finish_reason set → generation is complete; stop reading.
+				if fr := chunk.Choices[0].FinishReason; fr != nil && *fr != "" {
+					return sb.String(), nil
+				}
+			}
+		}
+		if rerr != nil {
+			break // EOF or read error → end of stream
+		}
+	}
+	return sb.String(), nil
+}
+
 func (p *OpenAIProvider) GenerateSchema(ctx context.Context, request GenerateRequest) (GenerateResponse, error) {
 	// Roll a fresh creative direction each call so the SAME brief produces a
 	// distinct design every time (Stitch-like). The 2-attempt loop means the
@@ -183,7 +314,7 @@ func (p *OpenAIProvider) GenerateSchema(ctx context.Context, request GenerateReq
 		if attempt > 0 {
 			v.Temperature = 0.6 // calmer retry to recover valid JSON
 		}
-		content, err := p.complete(ctx, schemaSystemPrompt(), schemaUserPrompt(request, v), v.Temperature)
+		content, err := p.complete(ctx, schemaSystemPrompt(), schemaUserPrompt(request, v), v.Temperature, 32768)
 		if err != nil {
 			lastErr = err
 			log.Printf("GenerateSchema: provider call failed (attempt %d): %v", attempt+1, err)
@@ -215,7 +346,7 @@ func (p *OpenAIProvider) RefineSection(ctx context.Context, request RefineReques
 
 	// Refine must be precise (apply the wish, change nothing else), so use a low
 	// temperature — variation belongs to fresh generation, not edits.
-	content, err := p.complete(ctx, system, user, 0.4)
+	content, err := p.complete(ctx, system, user, 0.4, 32768)
 	if err != nil {
 		return GenerateResponse{}, err
 	}
@@ -250,7 +381,7 @@ func (p *OpenAIProvider) GenerateApp(ctx context.Context, request AppRequest) (A
 		if attempt > 0 {
 			v.Temperature = 0.6 // calmer retry to recover valid JSON
 		}
-		content, err := p.complete(ctx, appSystemPrompt(), appUserPrompt(request, v), v.Temperature)
+		content, err := p.complete(ctx, appSystemPrompt(), appUserPrompt(request, v), v.Temperature, 32768)
 		if err != nil {
 			log.Printf("GenerateApp: provider call failed (attempt %d): %v", attempt+1, err)
 			continue
@@ -286,7 +417,7 @@ func (p *OpenAIProvider) GenerateApp(ctx context.Context, request AppRequest) (A
 			ps = parsed[i]
 		} else {
 			// Deterministic fallback for any page the model missed/botched.
-			ps = buildSchema(request.Prompt, plan.PageType, domainName, request.ThemeSlug)
+			ps = buildSchema(request.Prompt, plan.PageType, domainName, request.ThemeSlug, request.Platform)
 		}
 		ps.PageType = plan.PageType
 		out.Pages = append(out.Pages, AppPageResult{Name: plan.Name, PageType: plan.PageType, Schema: ps})
@@ -313,8 +444,9 @@ Output ONLY this JSON array (most to least important):
 [{"name":"...","pageType":"..."}]`, prompt, domain)
 
 	// Page planning should be stable (a fixed page set for a given brief), so
-	// keep it low-temperature — variation happens when filling each page.
-	content, err := p.complete(ctx, system, user, 0.4)
+	// keep it low-temperature — variation happens when filling each page. It only
+	// returns a tiny JSON array of names, so a small token budget keeps it fast.
+	content, err := p.complete(ctx, system, user, 0.4, 8000)
 	if err != nil {
 		return nil, err
 	}
@@ -336,13 +468,173 @@ Output ONLY this JSON array (most to least important):
 	return plans, nil
 }
 
+// GenerateUI designs a full mobile screen as self-contained HTML (Stitch-style
+// code-gen): the model has total layout freedom instead of filling a fixed
+// schema, so the output looks hand-designed. The markup renders raw inside the
+// preview's sandboxed iframe (allow-scripts, no same-origin → isolated).
+func (p *OpenAIProvider) GenerateUI(ctx context.Context, request UIRequest) (UIResponse, error) {
+	system, user := buildUIPrompts(request)
+	content, err := p.complete(ctx, system, user, 0.75, 8000)
+	if err != nil {
+		return UIResponse{}, err
+	}
+	html := extractHTML(content)
+	if len(strings.TrimSpace(html)) < 80 {
+		return UIResponse{}, errors.New("empty or too-short UI from provider")
+	}
+	return UIResponse{HTML: html}, nil
+}
+
+// GenerateUIStream is GenerateUI with live token streaming: as the screen is
+// written, onPartial(html) fires with the renderable HTML-so-far (only once the
+// <style> block is closed, so the preview never flashes unstyled), throttled to
+// avoid flooding. Returns the final cleaned HTML. Falls back to the caller's
+// non-streaming path on error.
+func (p *OpenAIProvider) GenerateUIStream(ctx context.Context, request UIRequest, onPartial func(html string)) (UIResponse, error) {
+	system, user := buildUIPrompts(request)
+	lastLen := 0
+	full, err := p.completeStream(ctx, system, user, 0.75, 8000, func(acc string) {
+		if onPartial == nil {
+			return
+		}
+		partial := stripReasoning(acc)
+		// Hold rendering until the styles are closed → clean build, no unstyled flash.
+		if !strings.Contains(partial, "</style>") {
+			return
+		}
+		partial = strings.TrimSpace(partial)
+		partial = strings.TrimPrefix(partial, "```html")
+		partial = strings.TrimPrefix(partial, "```")
+		if i := strings.Index(partial, "<style"); i > 0 {
+			partial = partial[i:]
+		}
+		// Throttle: only forward after meaningful growth.
+		if len(partial)-lastLen < 140 {
+			return
+		}
+		lastLen = len(partial)
+		onPartial(partial)
+	})
+	if err != nil && strings.TrimSpace(full) == "" {
+		return UIResponse{}, err
+	}
+	html := extractHTML(full)
+	if len(strings.TrimSpace(html)) < 80 {
+		return UIResponse{}, errors.New("empty or too-short UI from provider")
+	}
+	return UIResponse{HTML: html}, nil
+}
+
+// buildUIPrompts builds the (system, user) prompt pair for mobile code-gen,
+// shared by GenerateUI and GenerateUIStream.
+func buildUIPrompts(request UIRequest) (string, string) {
+	t := request.Tokens
+	tok := func(k, d string) string {
+		if v, ok := t[k]; ok && strings.TrimSpace(v) != "" {
+			return v
+		}
+		return d
+	}
+	palette := fmt.Sprintf("primary=%s; primaryText=%s; background=%s; card=%s; text=%s; mutedText=%s; border=%s; accent=%s; radius=%s; fontFamily=%s",
+		tok("primary", "#0a84ff"), tok("primary-fg", "#ffffff"), tok("content-bg", "#f2f2f7"), tok("card", "#ffffff"),
+		tok("fg", "#1c1c1e"), tok("muted-fg", "#8e8e93"), tok("border", "#e5e5ea"), tok("accent", "#e7f0ff"),
+		tok("radius", "20px"), tok("font", "-apple-system,system-ui,sans-serif"))
+
+	system := "You are an elite mobile product designer and front-end engineer. You produce ONE pixel-perfect, native-feeling MOBILE APP screen as a SINGLE self-contained HTML fragment with an embedded <style> block. Output ONLY the HTML — no markdown, no code fences, no commentary, and no <html>/<head>/<body>/<script> tags. Write the <style> block FIRST, then the markup. Think BRIEFLY, then write the code directly — do not over-deliberate."
+
+	user := fmt.Sprintf(`Design a NATIVE MOBILE APP screen (iOS/Android quality, like Google Stitch) for this brief.
+Brief: %q
+Screen type: %q
+
+THEME — use these EXACT colours/shape, match precisely:
+%s
+
+OUTPUT CONTRACT:
+- Output ONE <style> block (all rules scoped under .screen) FIRST, immediately followed by ONE root <div class="screen">…</div>. NOTHING else, no markdown.
+- NO external CSS/JS, NO Tailwind, NO CDN, NO <script>. Plain modern CSS only. Every icon is an INLINE stroke <svg> (22-24px).
+- 390px wide, ONE vertical column, a real app screen — NOT a website. Generous padding, rounded corners (theme radius), soft shadows, strong hierarchy, calm spacing rhythm.
+
+LAYOUT top→bottom: (1) status bar (time left; signal/wifi/battery right). (2) app bar: brand name + round notification icon. (3) big bold title + one muted subtitle. (4) the content the brief asks for as native cards. (5) a bottom TAB BAR with 4-5 inline-svg+label items, first active in the primary colour.
+
+NATIVE QUALITY (this is what separates it from a website):
+- TRANSACTIONS / LISTS → tappable rows: rounded leading icon/avatar + two-line title/subtitle (e.g. "Starbucks" / "Food & Dining · Today") + right-aligned amount. Real currency ("Rp 65.000", "-Rp 49.000"); positive amounts green, negative neutral/red.
+- QUICK ACTIONS → a horizontal row of 4 round-icon + label tiles (e.g. Transfer, Top Up, Pay Bills, Withdraw).
+- BALANCE/HERO → a prominent card with a big number ("Rp 24.500.000"), a small delta line, 1-2 pill buttons.
+- CHARTS → a clean inline-SVG line/area sparkline, never a heavy axis grid.
+- Realistic, specific copy in the SAME LANGUAGE as the brief. Never lorem ipsum, never empty placeholder boxes.
+
+KEEP IT FOCUSED & COMPACT: 4-6 sections total, concise CSS (group selectors, no redundancy), at most ~6 inline SVG icons reused via a small set. The whole output must be a tight, complete screen — finish it; do not pad or repeat.
+
+Return ONLY the <style> + <div class="screen">…</div>.`, request.Prompt, request.PageType, palette)
+	return system, user
+}
+
+// extractHTML pulls the screen markup out of a model response: strips <think>
+// reasoning and markdown fences, removes any <script> blocks (defensive — the
+// screen is static and we inject our own reveal animation), and trims to the
+// first style/markup tag through the last closing tag.
+func extractHTML(content string) string {
+	text := stripReasoning(strings.TrimSpace(content))
+	if strings.Contains(text, "```") {
+		text = strings.TrimSpace(text)
+		for _, fence := range []string{"```html", "```HTML", "```Html", "```"} {
+			text = strings.TrimPrefix(text, fence)
+		}
+		if j := strings.LastIndex(text, "```"); j >= 0 {
+			text = text[:j]
+		}
+		text = strings.TrimSpace(text)
+	}
+	// Drop any <script>…</script> blocks (and stray unterminated ones).
+	text = stripTagBlocks(text, "script")
+	// Trim to the first meaningful markup tag.
+	start := -1
+	for _, tag := range []string{"<style", "<div", "<section", "<main", "<header"} {
+		if k := strings.Index(text, tag); k >= 0 && (start < 0 || k < start) {
+			start = k
+		}
+	}
+	if start > 0 {
+		text = text[start:]
+	}
+	if end := strings.LastIndex(text, "</div>"); end >= 0 {
+		text = text[:end+len("</div>")]
+	}
+	return strings.TrimSpace(text)
+}
+
+// stripTagBlocks removes every <tag…>…</tag> region (case-insensitive) plus any
+// trailing unterminated opener.
+func stripTagBlocks(s, tag string) string {
+	lower := strings.ToLower(s)
+	open, close := "<"+tag, "</"+tag+">"
+	for {
+		i := strings.Index(lower, open)
+		if i < 0 {
+			break
+		}
+		j := strings.Index(lower[i:], close)
+		if j < 0 {
+			s = s[:i]
+			break
+		}
+		end := i + j + len(close)
+		s = s[:i] + s[end:]
+		lower = strings.ToLower(s)
+	}
+	return s
+}
+
 func appSystemPrompt() string {
 	return "You are a senior UI/Dashboard generator. You design a multi-page dashboard app. Respond with ONLY valid minified JSON — no markdown, no code fences, no commentary."
 }
 
 func appUserPrompt(request AppRequest, v variation) string {
+	platformBlock, _, _, _ := platformGuide(request.Platform)
 	var b strings.Builder
-	fmt.Fprintf(&b, "Generate a coherent multi-page dashboard app as JSON for this brief.\nBrief: %q\nDomain: %q\nThemeSlug: %q\n\n", request.Prompt, request.Domain, request.ThemeSlug)
+	fmt.Fprintf(&b, "Generate a coherent multi-page %s as JSON for this brief.\nBrief: %q\nDomain: %q\nThemeSlug: %q\n\n%s\n\n",
+		map[bool]string{true: "MOBILE APP (each page is a phone screen)", false: "dashboard app"}[strings.EqualFold(strings.TrimSpace(request.Platform), "mobile")],
+		request.Prompt, request.Domain, request.ThemeSlug, platformBlock)
 	b.WriteString("Produce EXACTLY these pages, in this order. Each page MUST cover a DISTINCT module/feature area of the brief — never repeat the same data, metrics, or table across pages:\n")
 	for i, p := range request.Pages {
 		fmt.Fprintf(&b, "%d) pageType=%q (default role: %s) — %s\n", i+1, p.PageType, p.Name, requirementsFor(p.PageType))
@@ -496,7 +788,36 @@ func requirementsFor(pageType string) string {
 	}
 }
 
+// platformGuide returns the target-specific design constraints injected into the
+// schema prompt. Mobile forces a single-column, bottom-tab, touch-first app shell;
+// web keeps the desktop sidebar / top-nav, multi-column behaviour.
+func platformGuide(platform string) (block, layoutRule, layoutShape, compositionRule string) {
+	if strings.EqualFold(strings.TrimSpace(platform), "mobile") {
+		block = `TARGET PLATFORM: MOBILE APP (≈390px wide phone screen).
+Design a NATIVE MOBILE app screen, NOT a shrunk website. The renderer turns your sections into native patterns, so pick sections that map to them:
+- The whole screen is ONE vertical column. NEVER use a side navigation / admin sidebar. EVERY section MUST use "span":"full".
+- Keep it FOCUSED: 3-5 sections only, most important first (thumb-reachable).
+- "statsGrid" renders as a horizontal METRIC SCROLLER — use 2-4 short metrics (the first is a hero card). Not a wide KPI wall.
+- "dataTable" renders as a tappable LIST of rows — keep it to AT MOST 3 columns: column 1 = the row title, an optional column 2 = a short subtitle, the last column = a status pill or a single value. No wide spreadsheets.
+- "filterToolbar" renders as a SEGMENTED PILL control — provide 2-4 short "filters" (e.g. ["All","Active","Pending"]); do NOT rely on a search box.
+- The primary create action becomes a FLOATING ACTION BUTTON — express it as a section "primaryAction" containing a word like "Create"/"Add"/"New". Do not add inline toolbar buttons.
+- Good mobile sections: hero (greeting/balance card), statsGrid (metric scroller), dataTable (list rows), featureGrid (quick actions), formSection, authForm. Avoid chartPanel-heavy or table-heavy desktop layouts.
+- Navigation is a BOTTOM TAB BAR: keep "nav" to EXACTLY 4-5 SHORT ONE-WORD labels (e.g. ["Home","Orders","Wallet","Profile"]).
+- For a login/register/forgot pageType, emit ONE authForm — it renders as a full-screen native sign-in screen (full-width inputs, a pinned primary button, a single "Continue with Google" button), so do NOT add other sections.`
+		layoutRule = `- "layout": MUST be "mobile-app" (this is a phone app screen — single column, bottom tab bar, no sidebar).`
+		layoutShape = "mobile-app"
+		compositionRule = `- COMPOSITION: this is a phone screen — give EVERY section "span":"full". Do NOT use "two-thirds", "half" or "third"; everything stacks in one column.`
+		return
+	}
+	block = `TARGET PLATFORM: WEBSITE (desktop-first, ≥1280px). Use the full canvas: sidebars, top navs, and multi-column magazine grids are all in play.`
+	layoutRule = `- "layout": choose the shell that fits the product — "admin-sidebar" for data/ops-heavy apps (dashboards, tables, CRMs), or "top-nav" for lighter portals, marketing, catalogs, or consumer apps. Pick deliberately from the brief; do NOT default to one.`
+	layoutShape = "admin-sidebar | top-nav"
+	compositionRule = `- COMPOSITION: give EACH section a "span" of "full" | "two-thirds" | "half" | "third" so the page forms a real magazine-style grid, not one stacked column. VARY it for THIS brief: pair a "two-thirds" chart with a "third" side panel; put two "half" panels in a row; use "full" for hero, statsGrid, galleries and wide tables. Avoid making every section "full".`
+	return
+}
+
 func schemaUserPrompt(request GenerateRequest, v variation) string {
+	platformBlock, layoutRule, layoutShape, compositionRule := platformGuide(request.Platform)
 	return fmt.Sprintf(`Generate a dashboard page schema as JSON for this brief.
 Brief: %q
 PageType: %q
@@ -505,9 +826,11 @@ ThemeSlug: %q
 
 %s
 
+%s
+
 Rules:
 - Output a single JSON object, no markdown, no commentary.
-- "layout": choose the shell that fits the product — "admin-sidebar" for data/ops-heavy apps (dashboards, tables, CRMs), or "top-nav" for lighter portals, marketing, catalogs, or consumer apps. Pick deliberately from the brief; do NOT default to one.
+%s
 - "brand": the product/app NAME inferred from the brief (e.g. "Vaultstream", "MediTrack"), NOT a generic word.
 - "nav": 4-7 PRODUCT-SPECIFIC menu items for THIS product's primary navigation, derived from the brief — e.g. a fintech → ["Overview","Transactions","Cards","Payouts","Disputes","Settings"]; a clinic → ["Dashboard","Patients","Appointments","Doctors","Billing"]. NEVER a generic ["Dashboard","Analytics","Customers","Projects","Reports"] list.
 - DESIGN PER PROMPT: the section MIX, ORDER, and COMPOSITION must reflect THIS brief — two different briefs must NOT produce the same skeleton. Choose the components the product actually needs (a kanban tool leads with a board, an analytics tool with charts, a catalog with a gallery), not a fixed KPI+chart+table template.
@@ -534,14 +857,17 @@ Rules:
 - ICONS: every statsGrid item and featureGrid item MUST include an "icon" chosen from: activity, users, user, calendar, wallet, dollar, credit-card, trending-up, trending-down, box, cart, bag, bar, line, pie, clock, bell, check, alert, settings, search, file, mail, home, star, heart, eye, layers, building, truck, zap, shield, globe, target, phone, link, tag, filter, download, upload, message, lock, gift, percent, refresh, briefcase, pin, edit, send. Pick the one that best fits the metric/feature.
 - chartPanel "chartType" can be: "bar", "line", "area", "pie", "donut", "stacked" (stacked bars), or "multiline" (multiple trend lines). Choose what fits the data.
 - IMAGES: hero, gallery, and profileSummary render real photos automatically. ALWAYS set concise "image" keywords (in English, 2-4 words describing the subject) on hero and on each gallery item so the photos are relevant to the brief. Prefer including at least one image-forward section (hero or gallery) when the brief suits it (landing, product, profile, catalog, media).
-- COMPOSITION: give EACH section a "span" of "full" | "two-thirds" | "half" | "third" so the page forms a real magazine-style grid, not one stacked column. VARY it for THIS brief: pair a "two-thirds" chart with a "third" side panel; put two "half" panels in a row; use "full" for hero, statsGrid, galleries and wide tables. Avoid making every section "full".
+%s
 - Tailor every label, metric, column, row, caption and icon to the brief and domain (realistic, specific data).
 
 Shape (set "layout", "brand", "nav" yourself per the rules above):
-{"pageType":%q,"domain":%q,"layout":"admin-sidebar | top-nav","theme":%q,"title":"...","brand":"...","nav":["...","..."],"sections":[ ... ]}`,
+{"pageType":%q,"domain":%q,"layout":%q,"theme":%q,"title":"...","brand":"...","nav":["...","..."],"sections":[ ... ]}`,
 		request.Prompt, request.PageType, request.Domain, request.ThemeSlug,
+		platformBlock,
 		requirementsFor(request.PageType),
-		request.PageType, request.Domain, request.ThemeSlug) + v.directive()
+		layoutRule,
+		compositionRule,
+		request.PageType, request.Domain, layoutShape, request.ThemeSlug) + v.directive()
 }
 
 func parseSchemaJSON(content string) (schema.PageSchema, error) {
@@ -563,6 +889,11 @@ func parseSchemaJSON(content string) (schema.PageSchema, error) {
 	var pageSchema schema.PageSchema
 	if err := json.Unmarshal([]byte(text), &pageSchema); err != nil {
 		return schema.PageSchema{}, apperrors.Validation("AI generated invalid JSON layout schema")
+	}
+	// Domain is an optional display/nav hint now — default it so an omission never
+	// fails the guardrail (which previously forced slow, pointless regeneration).
+	if strings.TrimSpace(pageSchema.Domain) == "" {
+		pageSchema.Domain = "custom"
 	}
 	if err := ValidateGeneratedSchema(pageSchema); err != nil {
 		return schema.PageSchema{}, apperrors.Validation(fmt.Sprintf("AI schema failed guardrail checks: %v", err))

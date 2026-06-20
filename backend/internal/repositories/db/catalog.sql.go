@@ -10,7 +10,7 @@ import (
 )
 
 const listTemplates = `-- name: ListTemplates :many
-SELECT id, name, domain, page_type, component_hint, tier, description
+SELECT id, name, domain, page_type, component_hint, tier, description, platform
 FROM templates
 ORDER BY name ASC
 `
@@ -23,6 +23,7 @@ type ListTemplatesRow struct {
 	ComponentHint int32
 	Tier          string
 	Description   string
+	Platform      string
 }
 
 func (q *Queries) ListTemplates(ctx context.Context) ([]ListTemplatesRow, error) {
@@ -42,6 +43,7 @@ func (q *Queries) ListTemplates(ctx context.Context) ([]ListTemplatesRow, error)
 			&i.ComponentHint,
 			&i.Tier,
 			&i.Description,
+			&i.Platform,
 		); err != nil {
 			return nil, err
 		}

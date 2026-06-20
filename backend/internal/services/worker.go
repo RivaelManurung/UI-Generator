@@ -2,165 +2,31 @@ package services
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/kreasinusantara/ui-generator-backend/internal/ai"
 	"github.com/kreasinusantara/ui-generator-backend/internal/domain"
 	"github.com/kreasinusantara/ui-generator-backend/internal/platform/logger"
-	"github.com/kreasinusantara/ui-generator-backend/internal/platform/metrics"
-	"github.com/kreasinusantara/ui-generator-backend/internal/queue"
 	"github.com/kreasinusantara/ui-generator-backend/internal/renderer"
 	"github.com/kreasinusantara/ui-generator-backend/internal/schema"
 )
 
+// GenerationWorker runs a single generation/refine job in-process (the async
+// Redis-queue consumer loop was removed with cmd/worker — generation now runs
+// inline via the batch goroutines and this ProcessJob entrypoint).
 type GenerationWorker struct {
-	log         logger.Logger
-	consumer    *queue.Consumer
-	studio      *StudioService
-	aiProvider  ai.Provider
-	MinIdleTime time.Duration
+	log        logger.Logger
+	studio     *StudioService
+	aiProvider ai.Provider
 }
 
-func NewGenerationWorker(log logger.Logger, consumer *queue.Consumer, studio *StudioService, aiProvider ai.Provider) *GenerationWorker {
+func NewGenerationWorker(log logger.Logger, studio *StudioService, aiProvider ai.Provider) *GenerationWorker {
 	return &GenerationWorker{
-		log:         log,
-		consumer:    consumer,
-		studio:      studio,
-		aiProvider:  aiProvider,
-		MinIdleTime: 5 * time.Minute,
+		log:        log,
+		studio:     studio,
+		aiProvider: aiProvider,
 	}
-}
-
-func (w *GenerationWorker) Start(ctx context.Context) error {
-	w.log.Info("starting generation worker consumer loop", nil)
-	if err := w.consumer.EnsureGroup(ctx); err != nil {
-		return fmt.Errorf("failed to ensure stream group: %w", err)
-	}
-
-	// Initial pending recovery on startup
-	w.recoverPending(ctx)
-
-	recoveryTicker := time.NewTicker(30 * time.Second)
-	defer recoveryTicker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			w.log.Info("generation worker stopping", nil)
-			return nil
-		case <-recoveryTicker.C:
-			w.recoverPending(ctx)
-		default:
-			msgs, err := w.consumer.ReadPending(ctx, 1, 2*time.Second)
-			if err != nil {
-				w.log.Error("failed to read from stream", map[string]interface{}{"error": err.Error()})
-				time.Sleep(1 * time.Second)
-				continue
-			}
-			for _, msg := range msgs {
-				w.processMessage(ctx, msg.ID, msg.Values["payload"])
-			}
-		}
-	}
-}
-
-func (w *GenerationWorker) recoverPending(ctx context.Context) {
-	pending, err := w.consumer.ClaimPending(ctx, w.MinIdleTime, 10)
-	if err != nil {
-		w.log.Error("failed to claim pending messages", map[string]interface{}{"error": err.Error()})
-		return
-	}
-
-	for _, msg := range pending {
-		if msg.IsFailed {
-			w.log.Error("pending message exceeded max attempts, marking job failed", map[string]interface{}{
-				"messageId": msg.ID,
-				"attempts":  msg.Attempts,
-			})
-			var task queue.GenerationTask
-			if err := json.Unmarshal([]byte(msg.Payload), &task); err == nil {
-				job, err := w.studio.jobs.FindOwned(ctx, task.UserID, task.JobID)
-				if err == nil {
-					_ = w.failJob(ctx, job, fmt.Sprintf("Generation job crashed and exceeded max retry attempts (attempts: %d)", msg.Attempts))
-				}
-			}
-			_ = w.consumer.Ack(ctx, msg.ID)
-			continue
-		}
-
-		w.log.Info("recovering and processing pending message", map[string]interface{}{
-			"messageId": msg.ID,
-			"attempts":  msg.Attempts,
-		})
-		metrics.IncQueueRetry()
-		w.processMessage(ctx, msg.ID, msg.Payload)
-	}
-}
-
-func (w *GenerationWorker) processMessage(ctx context.Context, msgID string, payloadVal interface{}) {
-	payloadStr, ok := payloadVal.(string)
-	if !ok {
-		w.log.Error("payload missing or not string", nil)
-		_ = w.consumer.Ack(ctx, msgID)
-		return
-	}
-	var task queue.GenerationTask
-	if err := json.Unmarshal([]byte(payloadStr), &task); err != nil {
-		w.log.Error("failed to unmarshal payload", map[string]interface{}{"error": err.Error()})
-		_ = w.consumer.Ack(ctx, msgID)
-		return
-	}
-
-	job, err := w.studio.jobs.FindOwned(ctx, task.UserID, task.JobID)
-	if err != nil {
-		w.log.Error("failed to find job for message", map[string]interface{}{"jobId": task.JobID, "error": err.Error()})
-		_ = w.consumer.Ack(ctx, msgID)
-		return
-	}
-
-	if job.Status == "succeeded" || job.Status == "failed" || job.Status == "refunded" {
-		w.log.Info("job already processed, skipping duplicate execution", map[string]interface{}{
-			"jobId":  job.ID,
-			"status": job.Status,
-		})
-		_ = w.consumer.Ack(ctx, msgID)
-		return
-	}
-
-	w.log.Info("processing job task", map[string]interface{}{"jobId": task.JobID, "userId": task.UserID})
-	
-	jobCtx, cancel := context.WithTimeout(ctx, 3*time.Minute)
-	defer cancel()
-
-	start := time.Now()
-	var processErr error
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				processErr = fmt.Errorf("job panicked: %v", r)
-			}
-		}()
-		processErr = w.ProcessJob(jobCtx, task.JobID, task.UserID, task.Operation, task.SectionIndex)
-	}()
-
-	duration := time.Since(start)
-
-	if processErr != nil {
-		w.log.Error("failed to process job task", map[string]interface{}{"jobId": task.JobID, "error": processErr.Error()})
-		// ensure job is failed if ProcessJob didn't propagate error
-		_ = w.studio.jobs.UpdateStatus(ctx, task.JobID, "failed", processErr.Error())
-	}
-
-	w.log.Info("job task execution completed", map[string]interface{}{
-		"job_id":      task.JobID,
-		"user_id":     task.UserID,
-		"duration_ms": duration.Milliseconds(),
-		"status":      job.Status,
-	})
-
-	_ = w.consumer.Ack(ctx, msgID)
 }
 
 func (w *GenerationWorker) ProcessJob(ctx context.Context, jobID string, userID string, operation string, sectionIndex int) error {

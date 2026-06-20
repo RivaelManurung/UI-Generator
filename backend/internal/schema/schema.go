@@ -55,6 +55,10 @@ type PageSchema struct {
 	Brand    string    `json:"brand,omitempty"` // product/app name shown in the nav
 	Nav      []string  `json:"nav,omitempty"`   // product-specific menu (prompt-driven, not canned)
 	Sections []Section `json:"sections"`
+	// Html, when set, is a full self-contained screen body generated directly by
+	// the model (Stitch-style code-gen). The preview renders it raw inside the
+	// sandboxed iframe instead of compiling Sections. Used for mobile projects.
+	Html string `json:"html,omitempty"`
 }
 
 // UnmarshalJSON tolerates nav given as strings or objects ({label}/{name}).
@@ -446,14 +450,20 @@ func Validate(page PageSchema) error {
 	if !allowedPageTypes[page.PageType] {
 		return fmt.Errorf("unsupported pageType %q", page.PageType)
 	}
-	if page.Domain == "" {
-		return errors.New("domain is required")
-	}
+	// NOTE: domain is intentionally NOT required. Projects no longer carry a domain
+	// (dropped in migration 000008 — it's inferred from the prompt now), so a model
+	// that omits it must not trip the guardrail and trigger a slow, pointless retry.
+	// It is defaulted to "custom" at parse time for display/nav purposes.
 	if page.Layout == "" {
 		return errors.New("layout is required")
 	}
 	if page.Theme == "" {
 		return errors.New("theme is required")
+	}
+	// A code-gen page carries its UI as a single self-contained Html body instead
+	// of Sections, so the section requirement does not apply to it.
+	if strings.TrimSpace(page.Html) != "" {
+		return nil
 	}
 	if len(page.Sections) == 0 {
 		return errors.New("at least one section is required")

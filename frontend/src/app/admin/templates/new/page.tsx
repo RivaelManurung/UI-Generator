@@ -54,6 +54,7 @@ export default function NewTemplatePage() {
   const [pageType, setPageType] = useState("dashboard");
   const [componentHint, setComponentHint] = useState("0");
   const [tier, setTier] = useState<"Free" | "Premium">("Free");
+  const [platform, setPlatform] = useState<"web" | "mobile">("web");
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -70,6 +71,7 @@ export default function NewTemplatePage() {
         pageType,
         componentHint: Number.isFinite(Number(componentHint)) ? Number(componentHint) : 0,
         tier,
+        platform,
         description: description.trim(),
       };
       if (id.trim()) {
@@ -188,6 +190,21 @@ export default function NewTemplatePage() {
                         <SelectContent>
                           <SelectItem value="Free">Free</SelectItem>
                           <SelectItem value="Premium">Premium</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="template-platform">Platform</Label>
+                      <Select
+                        value={platform}
+                        onValueChange={(value) => setPlatform(value as "web" | "mobile")}
+                      >
+                        <SelectTrigger id="template-platform" className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="web">Website</SelectItem>
+                          <SelectItem value="mobile">Mobile App</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

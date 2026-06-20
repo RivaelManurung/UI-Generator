@@ -14,11 +14,3 @@
  */
 
 export const PREVIEW_IFRAME_SANDBOX_POLICY = "allow-scripts";
-
-export function getSafeIframeProps(srcDocContent: string, titleText: string) {
-  return {
-    sandbox: PREVIEW_IFRAME_SANDBOX_POLICY,
-    srcDoc: srcDocContent,
-    title: titleText,
-  };
-}

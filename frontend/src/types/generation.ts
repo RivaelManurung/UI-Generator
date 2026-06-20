@@ -96,10 +96,13 @@ export interface PageSchema {
   /** Product-specific primary menu, generated from the prompt (not canned). */
   nav?: string[];
   sections: SchemaSection[];
+  /**
+   * A full self-contained screen body generated directly by the model (Stitch-
+   * style code-gen). When present, the preview renders it raw in the sandboxed
+   * iframe instead of compiling `sections`. Used for mobile projects.
+   */
+  html?: string;
 }
-
-// Alias for backward references
-export type DashboardSchema = PageSchema;
 
 export interface GenerationVersion {
   id: string;

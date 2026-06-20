@@ -37,7 +37,6 @@ smoke-test:
 	# Implement a basic smoke-test behavior
 	@echo "Running build smoke test..."
 	$(GO) build -o /dev/null ./cmd/api
-	$(GO) build -o /dev/null ./cmd/worker
 	@echo "Smoke test passed!"
 
 qa: fmt vet lint test test-race security vuln build smoke-test

@@ -10,7 +10,7 @@
  * `table`/`form` are admin-shell variants that lead with the matching section.
  */
 
-export type LayoutKind = "auth" | "dashboard" | "table" | "form" | "generic";
+export type LayoutKind = "auth" | "dashboard" | "table" | "form" | "generic" | "mobile";
 
 export type AuthVariant = "login" | "register" | "forgot";
 
@@ -111,12 +111,25 @@ const GENERIC_STEPS = [
   "Finalizing layout",
 ] as const;
 
+// Native mobile app screen — NO sidebar / data-table language. Mirrors the
+// phone shell the renderer produces (app bar + stacked cards + bottom tab bar).
+const MOBILE_STEPS = [
+  "Setting up screen",
+  "Building app bar",
+  "Composing hero card",
+  "Laying out quick actions",
+  "Adding content cards",
+  "Building bottom tab bar",
+  "Finalizing app screen",
+] as const;
+
 const STEPS_BY_KIND: Record<LayoutKind, readonly string[]> = {
   auth: AUTH_STEPS,
   dashboard: DASHBOARD_STEPS,
   table: TABLE_STEPS,
   form: FORM_STEPS,
   generic: GENERIC_STEPS,
+  mobile: MOBILE_STEPS,
 };
 
 export function stepsForKind(kind: LayoutKind): readonly string[] {

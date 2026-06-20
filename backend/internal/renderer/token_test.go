@@ -60,10 +60,10 @@ func TestGenerateKitTSX_RichSectionsRender(t *testing.T) {
 
 func TestIconSVGResolves(t *testing.T) {
 	cases := map[string]string{
-		"dollar":  iconPaths["dollar"],
-		"revenue": iconPaths["trending-up"], // alias
-		"patient": iconPaths["users"],        // alias
-		"":        iconPaths["activity"],     // default
+		"dollar":             iconPaths["dollar"],
+		"revenue":            iconPaths["trending-up"], // alias
+		"patient":            iconPaths["users"],       // alias
+		"":                   iconPaths["activity"],    // default
 		"nonsense word here": iconPaths["activity"],
 	}
 	for in, wantPath := range cases {

@@ -174,7 +174,7 @@ func TestLogoutRequiresAuthentication(t *testing.T) {
 
 func TestReadyzDependencyChecks(t *testing.T) {
 	cfg := testConfig()
-	cfg.DatabaseURL = "" // Starts in mock mode safely, but readyz will report down
+	cfg.DatabaseURL = ""                      // Starts in mock mode safely, but readyz will report down
 	cfg.RedisURL = "redis://unreachable:6379" // Doesn't panic startup, but readyz will report down
 
 	r := NewWithConfig(cfg)

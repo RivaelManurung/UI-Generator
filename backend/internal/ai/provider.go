@@ -118,6 +118,10 @@ type GenerateRequest struct {
 	PageType  string
 	Domain    string
 	ThemeSlug string
+	// Platform is the generation target: "web" (default) or "mobile". It branches
+	// the schema prompt so a mobile project gets a single-column, bottom-tab,
+	// touch-first layout instead of a desktop sidebar/multi-column grid.
+	Platform string
 }
 
 type RefineRequest struct {
@@ -143,6 +147,8 @@ type AppRequest struct {
 	Domain    string
 	ThemeSlug string
 	Pages     []AppPagePlan
+	// Platform branches the app prompt for a website vs a native mobile app.
+	Platform string
 }
 
 type AppPageResult struct {
@@ -172,6 +178,36 @@ type AppPlanner interface {
 	PlanApp(ctx context.Context, prompt, domain string) ([]AppPagePlan, error)
 }
 
+// UIRequest asks the model to design a screen as self-contained HTML (Stitch-
+// style code-gen) rather than filling a fixed schema.
+type UIRequest struct {
+	Prompt   string
+	PageType string
+	// Tokens are the design-system colour/shape values (keyed without "--") so
+	// the generated screen matches the chosen theme.
+	Tokens map[string]string
+}
+
+// UIResponse carries the generated screen markup + an inferred title.
+type UIResponse struct {
+	HTML  string
+	Title string
+}
+
+// UIGenerator is implemented by providers that can design a full screen as
+// self-contained HTML+CSS (no fixed schema). Optional capability: providers that
+// don't implement it fall back to the schema renderer.
+type UIGenerator interface {
+	GenerateUI(ctx context.Context, request UIRequest) (UIResponse, error)
+}
+
+// UIStreamer is a UIGenerator that can STREAM the screen as it is written:
+// onPartial(html) fires with the renderable HTML-so-far for a live "build"
+// preview. Optional — callers fall back to GenerateUI when unimplemented.
+type UIStreamer interface {
+	GenerateUIStream(ctx context.Context, request UIRequest, onPartial func(html string)) (UIResponse, error)
+}
+
 type MockProvider struct{}
 
 func NewMockProvider() *MockProvider {
@@ -193,7 +229,7 @@ func (MockProvider) GenerateSchema(_ context.Context, request GenerateRequest) (
 			domainName = intent.Domain
 		}
 	}
-	pageSchema := buildSchema(request.Prompt, pageType, domainName, request.ThemeSlug)
+	pageSchema := buildSchema(request.Prompt, pageType, domainName, request.ThemeSlug, request.Platform)
 	return GenerateResponse{
 		Schema:       pageSchema,
 		ProviderName: "mock-llm",
@@ -212,7 +248,7 @@ func (MockProvider) GenerateApp(_ context.Context, request AppRequest) (AppRespo
 		out.Pages = append(out.Pages, AppPageResult{
 			Name:     p.Name,
 			PageType: p.PageType,
-			Schema:   buildSchema(request.Prompt, p.PageType, domainName, request.ThemeSlug),
+			Schema:   buildSchema(request.Prompt, p.PageType, domainName, request.ThemeSlug, ""),
 		})
 	}
 	return out, nil
@@ -234,12 +270,19 @@ func (MockProvider) RefineSection(_ context.Context, request RefineRequest) (Gen
 	}, nil
 }
 
-func buildSchema(prompt, pageType, domainName, theme string) schema.PageSchema {
+func buildSchema(prompt, pageType, domainName, theme, platform string) schema.PageSchema {
 	labels := domainLabels(domainName)
+	mobile := strings.EqualFold(strings.TrimSpace(platform), "mobile")
+	layout := "admin-sidebar"
+	if mobile {
+		// A phone app screen: single column, bottom tab bar, no sidebar (handled by
+		// the preview compiler when layout == "mobile-app").
+		layout = "mobile-app"
+	}
 	base := schema.PageSchema{
 		PageType: pageType,
 		Domain:   domainName,
-		Layout:   "admin-sidebar",
+		Layout:   layout,
 		Theme:    theme,
 		Title:    labels.Title,
 		Brand:    labels.Title,
@@ -296,6 +339,12 @@ func buildSchema(prompt, pageType, domainName, theme string) schema.PageSchema {
 			chart,
 			activity,
 			table,
+		}
+	}
+	// On mobile, collapse the magazine grid: everything stacks full-width.
+	if mobile {
+		for i := range base.Sections {
+			base.Sections[i].Span = "full"
 		}
 	}
 	return base

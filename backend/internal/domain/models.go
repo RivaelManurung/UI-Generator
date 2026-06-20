@@ -3,14 +3,18 @@ package domain
 import "time"
 
 type Project struct {
-	ID               string    `json:"id"`
-	UserID           string    `json:"userId,omitempty"`
-	Name             string    `json:"name"`
-	Description      string    `json:"description"`
-	Status           string    `json:"status,omitempty"`
-	DefaultThemeSlug string    `json:"defaultThemeSlug"`
-	CreatedAt        time.Time `json:"createdAt"`
-	UpdatedAt        time.Time `json:"updatedAt"`
+	ID               string `json:"id"`
+	UserID           string `json:"userId,omitempty"`
+	Name             string `json:"name"`
+	Description      string `json:"description"`
+	Status           string `json:"status,omitempty"`
+	DefaultThemeSlug string `json:"defaultThemeSlug"`
+	// Platform is the generation target: "web" (default) or "mobile". It is stored
+	// outside the sqlc-generated queries (read/written via raw pool calls, like
+	// Status) so generation can branch the AI prompt + preview shell per project.
+	Platform  string    `json:"platform,omitempty"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
 }
 
 type Page struct {
@@ -110,4 +114,7 @@ type Template struct {
 	ComponentHint int    `json:"componentHint"`
 	Tier          string `json:"tier"`
 	Description   string `json:"description"`
+	// Platform is the generation target the "Use template" handoff pre-selects in
+	// the Studio: "web" (default) or "mobile".
+	Platform string `json:"platform,omitempty"`
 }

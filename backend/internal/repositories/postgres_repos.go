@@ -983,6 +983,7 @@ func (r *PostgresTemplateRepository) List(ctx context.Context) ([]domain.Templat
 			ComponentHint: int(item.ComponentHint),
 			Tier:          item.Tier,
 			Description:   item.Description,
+			Platform:      item.Platform,
 		}
 	}
 	return res, nil

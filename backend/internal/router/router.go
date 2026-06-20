@@ -17,11 +17,6 @@ import (
 	"github.com/kreasinusantara/ui-generator-backend/internal/services"
 )
 
-// New builds the Gin engine with middleware and routes registered.
-func New() *gin.Engine {
-	return NewWithConfig(config.Load())
-}
-
 func NewWithConfig(cfg config.Config) *gin.Engine {
 	r := gin.New()
 	r.Use(

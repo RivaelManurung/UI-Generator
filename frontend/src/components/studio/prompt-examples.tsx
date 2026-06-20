@@ -1,29 +1,37 @@
 "use client";
 
-import { ChartColumn, Users, Package, Box, LayoutDashboard } from "lucide-react";
-import { examplePrompts } from "@/lib/constants/prompt-examples";
+import { ChartColumn, Users, Package, Box, LayoutDashboard, Smartphone, MapPin, Heart, Wallet, ListChecks } from "lucide-react";
+import { examplePrompts, type ExampleIcon } from "@/lib/constants/prompt-examples";
 
-const iconMap = {
+const iconMap: Record<ExampleIcon, typeof ChartColumn> = {
   ChartColumn,
   Users,
   Package,
   Box,
   LayoutDashboard,
+  Smartphone,
+  MapPin,
+  Heart,
+  Wallet,
+  ListChecks,
 };
 
 interface PromptExamplesProps {
   onSelectPrompt: (promptText: string) => void;
+  /** Show only presets for this target (mobile projects get mobile presets). */
+  platform?: "web" | "mobile";
 }
 
-export function PromptExamples({ onSelectPrompt }: PromptExamplesProps) {
+export function PromptExamples({ onSelectPrompt, platform = "web" }: PromptExamplesProps) {
+  const presets = examplePrompts.filter((item) => item.platform === platform);
   return (
     <div className="space-y-2">
       <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-1">
-        Recommended Preset Examples
+        {platform === "mobile" ? "Mobile App Presets" : "Website Presets"}
       </p>
 
       <div className="grid gap-2">
-        {examplePrompts.map((item) => {
+        {presets.map((item) => {
           const Icon = iconMap[item.iconName];
 
           return (
